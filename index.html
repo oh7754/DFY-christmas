@@ -239,21 +239,26 @@
     // --- Firestore에서 실시간으로 이미지 목록 가져오기 ---
     const q = query(imagesCol, orderBy("createdAt", "asc"));
     onSnapshot(q, (snapshot) => {
-      console.log("Firestore snapshot size:", snapshot.size); // 디버그용
+      console.log("Firestore snapshot size:", snapshot.size); // 디버그용 로그
 
-      updateCount(snapshot.size);
-
+      // 오른쪽 창처럼 새로 들어온 클라이언트도
+      // 현재 존재하는 모든 문서를 한 번씩 처리해 준다.
       snapshot.docs.forEach((doc) => {
         const id = doc.id;
-        if (shownImageIds.has(id)) return; // 이 클라이언트에서 이미 추가한 건 스킵
+        if (shownImageIds.has(id)) return;   // 이 클라이언트에서 이미 붙인 건 스킵
         shownImageIds.add(id);
 
         const data = doc.data();
         if (data.url) {
+          console.log("addImageFromDoc:", id, data.url); // 디버그용
           addImageToTree(data.url);
         }
       });
+
+      // 총 개수 UI 업데이트
+      updateCount(snapshot.size);
     });
+
 
 
     // --- 파일 업로드 → Storage에 올리고 URL을 Firestore에 저장 ---
