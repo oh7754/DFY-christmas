@@ -140,9 +140,9 @@ button.small {
 /* ===== 오른쪽 세로 레일 ===== */
 #sideRail {
   position: fixed;
-  right: 32px;
-  top: 32px;
-  transform: translateY(-50%);
+  right: 12px;
+  top: 12px;
+  /* transform: translateY(-50%); */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -154,8 +154,8 @@ button.small {
 
 /* 공통 동그라미 버튼 */
 .circle {
-  width: 120px;
-  height: 120px;
+  width: 82px;
+  height: 82px;
   border-radius: 50%;
   border: none;
   outline: none;
@@ -239,7 +239,6 @@ button.small {
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  overflow: hidden;                 /* 동그라미 안으로 이미지 잘라주기 */
   background: #020617;              /* 이미지 로딩 전 배경색 */
   box-shadow: 0 8px 20px rgba(0,0,0,0.6);
   cursor: pointer;
