@@ -112,7 +112,7 @@
   } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js';
 
   // === Firebase 설정 ===
-const firebaseConfig = {
+  const firebaseConfig = {
     apiKey: "AIzaSyB_bZoaw6cvdrot7DEabrXsfyDYM-ZgaR0",
     authDomain: "dfy-christmas-tree-452d4.firebaseapp.com",
     projectId: "dfy-christmas-tree-452d4",
@@ -121,7 +121,7 @@ const firebaseConfig = {
     appId: "1:424198884902:web:cb6e92e8abe3299c5160e7",
     measurementId: "G-7TTVR9EM4E"
   };
-  
+
   // Firebase 초기화
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
@@ -132,8 +132,9 @@ const firebaseConfig = {
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
 
-// 회사도메인-------------------------------
-  const ALLOWED_DOMAIN = "dfy.co.kr";
+  // 🔴 여기를 실제 회사 이메일 도메인으로 바꿔줘
+  // 예: const ALLOWED_DOMAIN = "mycompany.co.kr";
+  const ALLOWED_DOMAIN = "yourcompany.com";
 
   function isAllowedDomain(email) {
     return email && email.endsWith("@" + ALLOWED_DOMAIN);
