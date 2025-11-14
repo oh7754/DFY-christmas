@@ -50,278 +50,322 @@
   <!-- three.js (r150.1, 예전 방식 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 
-  <script>
-    window.addEventListener("load", () => {
-      console.log("페이지 로드됨");
+  <script type="module">
+  // ===== Firebase CDN import =====
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js';
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    serverTimestamp
+  } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js';
+  import {
+    getStorage,
+    ref,
+    uploadBytes,
+    getDownloadURL
+  } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js';
 
-      // === 기본 세팅 ===
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x020617);
+  // === 여기를 Firebase 콘솔에서 복사한 걸로 바꿔 넣기 ===
+  const firebaseConfig = {
+    apiKey: "AIzaSyABAGj8HWNDnkOjh5LHowEhdJ8k7lJl-iw",
+    authDomain: "dfy-christmas-tree.firebaseapp.com",
+    projectId: "dfy-christmas-tree",
+    storageBucket: "dfy-christmas-tree.firebasestorage.app",
+    messagingSenderId: "135069318422",
+    appId: "1:135069318422:web:964fe40466315026612437",
+    measurementId: "G-0XVMXDFJM7"
+  };
+  // =============================================
 
-      const camera = new THREE.PerspectiveCamera(
-        45,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-      );
-      camera.position.set(0, 6, 14);
+  // Firebase 초기화
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+  const imagesCol = collection(db, "treeImages"); // 컬렉션 이름
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      document.body.appendChild(renderer.domElement);
+  // 이미 트리에 추가한 문서 id 기억용
+  const shownImageIds = new Set();
 
-      // 트리/장식들을 담을 그룹
-      const treeGroup = new THREE.Group();
-      scene.add(treeGroup);
+  window.addEventListener("load", () => {
+    console.log("페이지 로드됨");
 
-      // === 조명 ===
-      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
-      hemiLight.position.set(0, 1, 0);
-      scene.add(hemiLight);
+    // === 여기부터는 기존 three.js 코드 그대로 복붙 (scene, camera, treeGroup 등) ===
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020617);
 
-      const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-      dirLight.position.set(5, 10, 5);
-      scene.add(dirLight);
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 6, 14);
 
-      // === 바닥 ===
-      const groundGeo = new THREE.CircleGeometry(18, 64);
-      const groundMat = new THREE.MeshStandardMaterial({
-        color: 0x0b1220,
-        metalness: 0.2,
-        roughness: 0.8
-      });
-      const ground = new THREE.Mesh(groundGeo, groundMat);
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.y = 0;
-      scene.add(ground);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
 
-      // === 트리 몸통 + 기둥 ===
-      const treeHeight = 8;
-      const treeRadius = 3;
+    const treeGroup = new THREE.Group();
+    scene.add(treeGroup);
 
-      const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.5, 16);
-      const trunkMat = new THREE.MeshStandardMaterial({
-        color: 0x5b3a1e,
-        roughness: 0.9
-      });
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.y = 0.75;
-      treeGroup.add(trunk);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
+    hemiLight.position.set(0, 1, 0);
+    scene.add(hemiLight);
 
-      const treeGeo = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
-      const treeMat = new THREE.MeshStandardMaterial({
-        color: 0x0f766e,
-        roughness: 0.6,
-        metalness: 0.2
-      });
-      const tree = new THREE.Mesh(treeGeo, treeMat);
-      tree.position.y = 0.75 + treeHeight / 2;
-      treeGroup.add(tree);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(5, 10, 5);
+    scene.add(dirLight);
 
-      // === 별 ===
-      const starGeo = new THREE.OctahedronGeometry(0.4);
-      const starMat = new THREE.MeshStandardMaterial({
-        color: 0xfacc15,
-        emissive: 0xfacc15,
-        emissiveIntensity: 0.6,
-        metalness: 0.9,
-        roughness: 0.3
-      });
-      const star = new THREE.Mesh(starGeo, starMat);
-      star.position.y = tree.position.y + treeHeight / 2 + 0.8;
-      treeGroup.add(star);
-
-      // === 눈 파티클 ===
-      const snowCount = 600;
-      const snowGeo = new THREE.BufferGeometry();
-      const snowPositions = new Float32Array(snowCount * 3);
-      for (let i = 0; i < snowCount; i++) {
-        snowPositions[i * 3 + 0] = (Math.random() - 0.5) * 40;
-        snowPositions[i * 3 + 1] = Math.random() * 20 + 2;
-        snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
-      }
-      snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
-      const snowMat = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 0.06
-      });
-      const snow = new THREE.Points(snowGeo, snowMat);
-      scene.add(snow);
-
-      // === 업로드된 사진 관리 ===
-      const uploadedPictures = [];
-      const countEl = document.getElementById("count");
-
-      function updateCount() {
-        countEl.textContent = `걸린 사진: ${uploadedPictures.length}장`;
-      }
-
-      // 트리 표면 위 랜덤 위치
-      function getRandomPositionOnTree() {
-        const yMin = tree.position.y - treeHeight / 2 + 0.5;
-        const yMax = tree.position.y + treeHeight / 2 - 0.5;
-        const y = yMin + Math.random() * (yMax - yMin);
-
-        const normalizedHeight =
-          (y - (tree.position.y - treeHeight / 2)) / treeHeight; // 0~1
-        const radiusAtY = treeRadius * (1 - normalizedHeight) + 0.2;
-
-        const angle = Math.random() * Math.PI * 2;
-        const x = Math.cos(angle) * radiusAtY;
-        const z = Math.sin(angle) * radiusAtY;
-
-        const position = new THREE.Vector3(x, y, z);
-        return { position };
-      }
-
-      function addImageToTree(imageUrl) {
-        const texLoader = new THREE.TextureLoader();
-        texLoader.load(
-          imageUrl,
-          (texture) => {
-            const aspect = texture.image.width / texture.image.height;
-            const baseHeight = 1.0;
-            const width = baseHeight * aspect;
-            const height = baseHeight;
-
-            const geo = new THREE.PlaneGeometry(width, height);
-            const mat = new THREE.MeshBasicMaterial({
-              map: texture,
-              transparent: true,
-              side: THREE.DoubleSide
-            });
-            const plane = new THREE.Mesh(geo, mat);
-
-            const { position } = getRandomPositionOnTree();
-            plane.position.copy(position);
-
-            plane.lookAt(new THREE.Vector3(0, position.y, 0));
-            plane.rotateY(Math.PI);
-
-            treeGroup.add(plane); // 트리와 함께 도는 그룹에 추가
-            uploadedPictures.push(plane);
-            updateCount();
-          },
-          undefined,
-          (err) => {
-            console.error("텍스처 로드 오류", err);
-          }
-        );
-      }
-
-      // === 파일 업로드 ===
-      const fileInput = document.getElementById("fileInput");
-      fileInput.addEventListener("change", (event) => {
-        const files = event.target.files;
-        if (!files || !files.length) return;
-
-        Array.from(files).forEach((file) => {
-          if (!file.type.startsWith("image/")) return;
-
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target.result;
-            addImageToTree(imageUrl);
-          };
-          reader.readAsDataURL(file);
-        });
-
-        fileInput.value = "";
-      });
-
-      // === 마우스 드래그로 트리 회전 ===
-      let isDragging = false;
-      let prevX = 0;
-      let prevY = 0;
-      const dragRotateSpeed = 0.005;
-
-      renderer.domElement.addEventListener("mousedown", (event) => {
-        isDragging = true;
-        prevX = event.clientX;
-        prevY = event.clientY;
-      });
-
-      window.addEventListener("mouseup", () => {
-        isDragging = false;
-      });
-
-      window.addEventListener("mousemove", (event) => {
-        if (!isDragging) return;
-        const deltaX = event.clientX - prevX;
-        const deltaY = event.clientY - prevY;
-        prevX = event.clientX;
-        prevY = event.clientY;
-
-        // 좌우 드래그로 Y축 회전
-        treeGroup.rotation.y += deltaX * dragRotateSpeed;
-        // 위아래 드래그로 약간 숙이고 들기 (제한)
-        const newX = THREE.MathUtils.clamp(
-          treeGroup.rotation.x + deltaY * dragRotateSpeed,
-          -Math.PI / 6,
-          Math.PI / 6
-        );
-        treeGroup.rotation.x = newX;
-      });
-
-      // === 휠로 줌 인/아웃 ===
-      renderer.domElement.addEventListener("wheel", (event) => {
-        event.preventDefault();
-        const zoomSpeed = 0.002;
-        const delta = event.deltaY * zoomSpeed;
-        const minDist = 8;
-        const maxDist = 25;
-
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir); // 카메라 시선 방향
-
-        const newPos = camera.position.clone().addScaledVector(dir, delta * 20);
-        const distance = newPos.length();
-
-        if (distance > minDist && distance < maxDist) {
-          camera.position.copy(newPos);
-        }
-      }, { passive: false });
-
-      // === 리사이즈 ===
-      window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-
-      // === 렌더 루프 ===
-      let lastTime = 0;
-      function animate(time) {
-        requestAnimationFrame(animate);
-        const delta = (time - lastTime) / 1000;
-        lastTime = time;
-
-        // 자동으로 살짝 회전 (드래그 안 할 때)
-        if (!isDragging) {
-          treeGroup.rotation.y += delta * 0.2;
-        }
-        star.rotation.y -= delta * 0.4;
-
-        // 눈 떨어지는 애니메이션
-        const pos = snowGeo.attributes.position;
-        for (let i = 0; i < snowCount; i++) {
-          let y = pos.getY(i);
-          y -= delta * (0.5 + Math.random() * 0.3);
-          if (y < 0.5) {
-            y = Math.random() * 20 + 5;
-          }
-          pos.setY(i, y);
-        }
-        pos.needsUpdate = true;
-
-        // 카메라는 항상 트리 중앙을 바라보게
-        camera.lookAt(0, tree.position.y, 0);
-
-        renderer.render(scene, camera);
-      }
-      animate(0);
+    const groundGeo = new THREE.CircleGeometry(18, 64);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x0b1220,
+      metalness: 0.2,
+      roughness: 0.8
     });
-  </script>
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    scene.add(ground);
+
+    const treeHeight = 8;
+    const treeRadius = 3;
+
+    const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.5, 16);
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: 0x5b3a1e,
+      roughness: 0.9
+    });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 0.75;
+    treeGroup.add(trunk);
+
+    const treeGeo = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
+    const treeMat = new THREE.MeshStandardMaterial({
+      color: 0x0f766e,
+      roughness: 0.6,
+      metalness: 0.2
+    });
+    const tree = new THREE.Mesh(treeGeo, treeMat);
+    tree.position.y = 0.75 + treeHeight / 2;
+    treeGroup.add(tree);
+
+    const starGeo = new THREE.OctahedronGeometry(0.4);
+    const starMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      emissive: 0xfacc15,
+      emissiveIntensity: 0.6,
+      metalness: 0.9,
+      roughness: 0.3
+    });
+    const star = new THREE.Mesh(starGeo, starMat);
+    star.position.y = tree.position.y + treeHeight / 2 + 0.8;
+    treeGroup.add(star);
+
+    const snowCount = 600;
+    const snowGeo = new THREE.BufferGeometry();
+    const snowPositions = new Float32Array(snowCount * 3);
+    for (let i = 0; i < snowCount; i++) {
+      snowPositions[i * 3 + 0] = (Math.random() - 0.5) * 40;
+      snowPositions[i * 3 + 1] = Math.random() * 20 + 2;
+      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+    }
+    snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
+    const snowMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.06
+    });
+    const snow = new THREE.Points(snowGeo, snowMat);
+    scene.add(snow);
+
+    const countEl = document.getElementById("count");
+    function updateCount(num) {
+      countEl.textContent = `걸린 사진: ${num}장`;
+    }
+
+    function getRandomPositionOnTree() {
+      const yMin = tree.position.y - treeHeight / 2 + 0.5;
+      const yMax = tree.position.y + treeHeight / 2 - 0.5;
+      const y = yMin + Math.random() * (yMax - yMin);
+      const normalizedHeight =
+        (y - (tree.position.y - treeHeight / 2)) / treeHeight;
+      const radiusAtY = treeRadius * (1 - normalizedHeight) + 0.2;
+
+      const angle = Math.random() * Math.PI * 2;
+      const x = Math.cos(angle) * radiusAtY;
+      const z = Math.sin(angle) * radiusAtY;
+
+      const position = new THREE.Vector3(x, y, z);
+      return { position };
+    }
+
+    // --- 이미지 한 장을 트리에 추가 ---
+    function addImageToTree(imageUrl) {
+      const texLoader = new THREE.TextureLoader();
+      texLoader.load(
+        imageUrl,
+        (texture) => {
+          const aspect = texture.image.width / texture.image.height;
+          const baseHeight = 1.0;
+          const width = baseHeight * aspect;
+          const height = baseHeight;
+
+          const geo = new THREE.PlaneGeometry(width, height);
+          const mat = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide
+          });
+          const plane = new THREE.Mesh(geo, mat);
+
+          const { position } = getRandomPositionOnTree();
+          plane.position.copy(position);
+          plane.lookAt(new THREE.Vector3(0, position.y, 0));
+          plane.rotateY(Math.PI);
+
+          treeGroup.add(plane);
+        },
+        undefined,
+        (err) => {
+          console.error("텍스처 로드 오류", err);
+        }
+      );
+    }
+
+    // --- Firestore에서 실시간으로 이미지 목록 가져오기 ---
+    const q = query(imagesCol, orderBy("createdAt", "asc"));
+    onSnapshot(q, (snapshot) => {
+      updateCount(snapshot.size);
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const id = change.doc.id;
+          if (shownImageIds.has(id)) return;
+          shownImageIds.add(id);
+
+          const data = change.doc.data();
+          if (data.url) {
+            addImageToTree(data.url);
+          }
+        }
+      });
+    });
+
+    // --- 파일 업로드 → Storage에 올리고 URL을 Firestore에 저장 ---
+    async function uploadAndRegister(file) {
+      const filePath = `uploads/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, filePath);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      await addDoc(imagesCol, {
+        url: downloadURL,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    const fileInput = document.getElementById("fileInput");
+    fileInput.addEventListener("change", (event) => {
+      const files = event.target.files;
+      if (!files || !files.length) return;
+
+      Array.from(files).forEach((file) => {
+        if (!file.type.startsWith("image/")) return;
+        uploadAndRegister(file).catch((err) =>
+          console.error("업로드 실패", err)
+        );
+      });
+
+      fileInput.value = "";
+    });
+
+    // === 드래그 회전 / 휠 줌, 리사이즈, 애니메이션 루프 (기존 코드 그대로) ===
+    let isDragging = false;
+    let prevX = 0;
+    let prevY = 0;
+    const dragRotateSpeed = 0.005;
+
+    renderer.domElement.addEventListener("mousedown", (event) => {
+      isDragging = true;
+      prevX = event.clientX;
+      prevY = event.clientY;
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
+
+    window.addEventListener("mousemove", (event) => {
+      if (!isDragging) return;
+      const deltaX = event.clientX - prevX;
+      const deltaY = event.clientY - prevY;
+      prevX = event.clientX;
+      prevY = event.clientY;
+
+      treeGroup.rotation.y += deltaX * dragRotateSpeed;
+      const newX = THREE.MathUtils.clamp(
+        treeGroup.rotation.x + deltaY * dragRotateSpeed,
+        -Math.PI / 6,
+        Math.PI / 6
+      );
+      treeGroup.rotation.x = newX;
+    });
+
+    renderer.domElement.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const zoomSpeed = 0.002;
+      const delta = event.deltaY * zoomSpeed;
+      const minDist = 8;
+      const maxDist = 25;
+
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+
+      const newPos = camera.position.clone().addScaledVector(dir, delta * 20);
+      const distance = newPos.length();
+
+      if (distance > minDist && distance < maxDist) {
+        camera.position.copy(newPos);
+      }
+    }, { passive: false });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    let lastTime = 0;
+    function animate(time) {
+      requestAnimationFrame(animate);
+      const delta = (time - lastTime) / 1000;
+      lastTime = time;
+
+      if (!isDragging) {
+        treeGroup.rotation.y += delta * 0.2;
+      }
+      star.rotation.y -= delta * 0.4;
+
+      const pos = snowGeo.attributes.position;
+      for (let i = 0; i < snowCount; i++) {
+        let y = pos.getY(i);
+        y -= delta * (0.5 + Math.random() * 0.3);
+        if (y < 0.5) {
+          y = Math.random() * 20 + 5;
+        }
+        pos.setY(i, y);
+      }
+      pos.needsUpdate = true;
+
+      camera.lookAt(0, tree.position.y, 0);
+      renderer.render(scene, camera);
+    }
+    animate(0);
+  });
+</script>
+
 </body>
 </html>
