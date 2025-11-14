@@ -65,19 +65,23 @@
 
     <!-- 로그인 상태 표시 -->
     <div id="userInfo"
-         style="margin-top: 6px; font-size: 12px; opacity: .9;">
+        style="margin-top: 6px; font-size: 12px; opacity: .9;">
       로그인 필요 (사내 구글 계정만 가능)
     </div>
 
     <!-- 로그인 / 로그아웃 버튼 -->
     <div style="margin-top: 6px; display: flex; gap: 6px;">
-      <button id="loginBtn">Google 계정으로 로그인</button>
-      <button id="logoutBtn" class="secondary" style="display:none;">
+      <button id="loginBtn"
+              style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border:none; cursor:pointer; background:#22c55e; color:#022c22;">
+        Google 계정으로 로그인
+      </button>
+      <button id="logoutBtn"
+              style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border:1px solid #1f2937; background:#0f172a; color:#e5e7eb; cursor:pointer; display:none;">
         로그아웃
       </button>
     </div>
 
-    <!-- 파일 업로드 -->
+    <!-- 파일 업로드 (처음엔 막아둠) -->
     <input id="fileInput" type="file" multiple accept="image/*" disabled />
     <div id="count">걸린 사진: 0장</div>
   </div>
@@ -126,7 +130,7 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const storage = getStorage(app);
-  const imagesCol = collection(db, "treeImages"); // 컬렉션 이름
+  const imagesCol = collection(db, "treeImages");
 
   // --- Auth 초기화 ---
   const auth = getAuth(app);
@@ -134,11 +138,12 @@
 
   // 🔴 여기를 실제 회사 이메일 도메인으로 바꿔줘
   // 예: const ALLOWED_DOMAIN = "mycompany.co.kr";
-  const ALLOWED_DOMAIN = "yourcompany.com";
+  const ALLOWED_DOMAIN = "dfy.co.kr";
 
   function isAllowedDomain(email) {
     return email && email.endsWith("@" + ALLOWED_DOMAIN);
   }
+
 
   // 이미 트리에 추가한 문서 id 기억용
   const shownImageIds = new Set();
@@ -146,31 +151,31 @@
   window.addEventListener("load", () => {
     console.log("페이지 로드됨");
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
+    const loginBtn   = document.getElementById("loginBtn");
+    const logoutBtn  = document.getElementById("logoutBtn");
     const userInfoEl = document.getElementById("userInfo");
-    const fileInput = document.getElementById("fileInput");
+    const fileInput  = document.getElementById("fileInput");
 
     // 로그인 상태 변화 감지
     onAuthStateChanged(auth, (user) => {
       if (user && isAllowedDomain(user.email)) {
         // ✅ 사내 계정으로 로그인
         userInfoEl.textContent = `로그인: ${user.email}`;
-        loginBtn.style.display = "none";
+        loginBtn.style.display  = "none";
         logoutBtn.style.display = "inline-block";
-        fileInput.disabled = false;
+        fileInput.disabled      = false;
       } else if (user && !isAllowedDomain(user.email)) {
-        // ❌ 다른 도메인 계정
+        // ❌ 구글이긴 한데 다른 도메인
         userInfoEl.textContent = `허용되지 않은 도메인입니다: ${user.email}`;
-        loginBtn.style.display = "inline-block";
+        loginBtn.style.display  = "inline-block";
         logoutBtn.style.display = "inline-block";
-        fileInput.disabled = true;
+        fileInput.disabled      = true;
       } else {
         // 로그인 안 된 상태
         userInfoEl.textContent = "로그인 필요 (사내 구글 계정만 가능)";
-        loginBtn.style.display = "inline-block";
+        loginBtn.style.display  = "inline-block";
         logoutBtn.style.display = "none";
-        fileInput.disabled = true;
+        fileInput.disabled      = true;
       }
     });
 
@@ -192,6 +197,10 @@
         console.error("로그아웃 실패", err);
       }
     });
+
+    // 🔽 이 아래부터는 기존 three.js / Firestore 코드 그대로 유지
+    // const scene = new THREE.Scene(); ...
+
 
     // === 여기부터 기존 three.js / Firestore 코드 ===
 
@@ -374,7 +383,7 @@
       const files = event.target.files;
       if (!files || !files.length) return;
 
-      // 혹시라도 버튼 상태 꼬였을 때를 대비해서 한 번 더 체크
+      // 마지막 방어: 실제로 로그인 + 회사 도메인인지 확인
       const user = auth.currentUser;
       if (!user || !isAllowedDomain(user.email)) {
         alert("사내 구글 계정으로 로그인해야 업로드할 수 있습니다.");
@@ -391,6 +400,7 @@
 
       fileInput.value = "";
     });
+
 
     // === 드래그 회전 / 휠 줌, 리사이즈, 애니메이션 루프 ===
     let isDragging = false;
