@@ -182,7 +182,7 @@ button.small {
   height: 72px;
   border-radius: 50%;
   object-fit: cover;
-  display: none; /* 기본은 숨김, 사진 있을 때만 보이게 */
+  /* display: none; 기본은 숨김, 사진 있을 때만 보이게 */
 }
 
 #profileInitials {
