@@ -197,13 +197,15 @@ button.small {
   background: #1f2937;
 }
 
-/* #profileEmail {
-    position: fixed;
-  margin-top: 76px;
+#profileEmail {
+  width: 100%;
+  position: absolute;
+  /* background-color: #ef4444; */
+  margin-top: 82px;
   font-size: 11px;
   opacity: 0.8;
   text-align: center;
-} */
+}
 
 /* 로그인 안 되었을 때 */
 .profile-circle.logged-out #profileEmail {
@@ -231,6 +233,10 @@ button.small {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  /* background-color: #22c55e; */
+  width: 72px;
+  text-align: center;
+  
 }
 
 /* 코인 하나 */
