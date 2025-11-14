@@ -531,10 +531,17 @@ function renderMyWishList() {
     const data = docSnap.data();
     const id = docSnap.id;
 
+    // 바깥 동그라미 컨테이너
     const coin = document.createElement("div");
     coin.className = "wish-coin";
 
-    // 코인 클릭 → 편지 패널 열기
+    // 실제 업로드한 이미지 썸네일
+    const thumb = document.createElement("img");
+    thumb.className = "wish-coin-thumb";
+    thumb.src = data.url;          // Firebase에 저장된 이미지 URL
+    thumb.alt = data.wishName || data.originalName || "wish image";
+
+    // 이미지 전체 클릭 → 편지 패널 열기
     coin.addEventListener("click", () => {
       showWishPanel({
         wishName: data.wishName,
@@ -543,13 +550,15 @@ function renderMyWishList() {
       });
     });
 
+    // 삭제용 빨간 점
     const dot = document.createElement("div");
     dot.className = "delete-dot";
     dot.addEventListener("click", (e) => {
-      e.stopPropagation();
+      e.stopPropagation();        // 이미지 클릭 이벤트 막기
       handleDeleteImage(id, data);
     });
 
+    coin.appendChild(thumb);
     coin.appendChild(dot);
     myWishListEl.appendChild(coin);
   });
