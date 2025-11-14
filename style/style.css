@@ -86,3 +86,53 @@ canvas {
   max-height: 120px;
   overflow: auto;
 }
+
+.hidden {
+  display: none;
+}
+
+/* 소원 편지 패널 */
+.wish-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 260px;
+  max-height: 260px;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.98);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  backdrop-filter: blur(10px);
+  font-size: 12px;
+  z-index: 20;
+}
+
+.wish-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.wish-from {
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.wish-body {
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: radial-gradient(circle at top left, #22c55e33, #020617);
+  border-radius: 8px;
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  color: #e5e7eb;
+  line-height: 1.5;
+  overflow-y: auto;
+  max-height: 170px;
+}
+
+button.small {
+  padding: 2px 6px;
+  font-size: 11px;
+}

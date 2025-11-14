@@ -56,11 +56,23 @@ const userInfoEl = document.getElementById("userInfo");
 const fileInput = document.getElementById("fileInput");
 const countEl = document.getElementById("count");
 const myImagesList = document.getElementById("myImagesList");
+const wishNameInput = document.getElementById("wishName");
+const wishTextInput = document.getElementById("wishText");
+
+// 편지 패널 요소
+const wishPanel = document.getElementById("wishPanel");
+const wishSenderEl = document.getElementById("wishSender");
+const wishContentEl = document.getElementById("wishContent");
+const wishCloseBtn = document.getElementById("wishCloseBtn");
 
 // 상태 변수
 let currentUser = null;
 const shownImageIds = new Set();
 let lastSnapshot = null;
+
+// 트리에 걸린 이미지 메쉬들 → 소원 데이터 매핑
+const imageMeshes = [];
+const meshToData = new Map();
 
 // 도메인 체크
 function isAllowedDomain(email) {
@@ -76,6 +88,8 @@ onAuthStateChanged(auth, (user) => {
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
     fileInput.disabled = false;
+    wishNameInput.disabled = false;
+    wishTextInput.disabled = false;
   } else if (user && !isAllowedDomain(user.email)) {
     // ❌ 다른 구글 계정
     currentUser = null;
@@ -83,6 +97,8 @@ onAuthStateChanged(auth, (user) => {
     loginBtn.style.display = "inline-block";
     logoutBtn.style.display = "inline-block";
     fileInput.disabled = true;
+    wishNameInput.disabled = true;
+    wishTextInput.disabled = true;
   } else {
     // 로그아웃 상태
     currentUser = null;
@@ -90,6 +106,8 @@ onAuthStateChanged(auth, (user) => {
     loginBtn.style.display = "inline-block";
     logoutBtn.style.display = "none";
     fileInput.disabled = true;
+    wishNameInput.disabled = true;
+    wishTextInput.disabled = true;
   }
 
   renderMyImages(); // 내 이미지 리스트 다시 그리기
@@ -109,6 +127,7 @@ loginBtn.addEventListener("click", async () => {
 logoutBtn.addEventListener("click", async () => {
   try {
     await signOut(auth);
+    closeWishPanel();
   } catch (err) {
     console.error("로그아웃 실패", err);
   }
@@ -224,10 +243,11 @@ function getRandomPositionOnTree() {
 }
 
 // --- 이미지 한 장을 트리에 추가 ---
-function addImageToTree(imageUrl) {
+// docId, data 를 같이 받아서 meshToData 에 저장
+function addImageToTree(docId, data) {
   const texLoader = new THREE.TextureLoader();
   texLoader.load(
-    imageUrl,
+    data.url,
     (texture) => {
       const aspect = texture.image.width / texture.image.height;
       const baseHeight = 1.0;
@@ -248,6 +268,12 @@ function addImageToTree(imageUrl) {
       plane.rotateY(Math.PI);
 
       treeGroup.add(plane);
+
+      imageMeshes.push(plane);
+      meshToData.set(plane, {
+        ...data,
+        id: docId,
+      });
     },
     undefined,
     (err) => {
@@ -270,7 +296,7 @@ onSnapshot(q, (snapshot) => {
     const data = docSnap.data();
     if (data.url) {
       console.log("addImageFromDoc:", id, data.url);
-      addImageToTree(data.url);
+      addImageToTree(id, data);
     }
   });
 
@@ -290,14 +316,23 @@ async function uploadAndRegister(file) {
   const snapshot = await uploadBytes(storageRef, file);
   const downloadURL = await getDownloadURL(snapshot.ref);
 
+  const wishName = (wishNameInput.value || "").trim();
+  const wishText = (wishTextInput.value || "").trim();
+
   await addDoc(imagesCol, {
     url: downloadURL,
     path: filePath, // 삭제할 때 쓸 경로
     ownerUid: currentUser.uid,
     ownerEmail: currentUser.email,
     originalName: file.name,
+    wishName,
+    wishText,
     createdAt: serverTimestamp(),
   });
+
+  // 업로드 후 소원 입력칸은 비워두고, 이름은 유지할지 말지는 취향인데
+  // 일단 이름은 유지, 소원만 초기화
+  wishTextInput.value = "";
 }
 
 // 업로드 인풋
@@ -362,7 +397,10 @@ function renderMyImages() {
     row.style.marginBottom = "2px";
 
     const nameSpan = document.createElement("span");
-    nameSpan.textContent = data.originalName || "사진";
+    const labelParts = [];
+    if (data.originalName) labelParts.push(data.originalName);
+    if (data.wishName) labelParts.push(`(${data.wishName})`);
+    nameSpan.textContent = labelParts.join(" ");
     nameSpan.style.flex = "1";
     nameSpan.style.whiteSpace = "nowrap";
     nameSpan.style.overflow = "hidden";
@@ -370,9 +408,7 @@ function renderMyImages() {
 
     const delBtn = document.createElement("button");
     delBtn.textContent = "삭제";
-    delBtn.classList.add("secondary");
-    delBtn.style.fontSize = "10px";
-    delBtn.style.padding = "2px 6px";
+    delBtn.classList.add("secondary", "small");
 
     delBtn.addEventListener("click", () =>
       handleDeleteImage(docSnap.id, data)
@@ -404,6 +440,50 @@ async function handleDeleteImage(docId, data) {
     alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
   }
 }
+
+// ----- 트리에 걸린 이미지 클릭 → 소원 편지 띄우기 -----
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+renderer.domElement.addEventListener("click", (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  pointer.set(x, y);
+  raycaster.setFromCamera(pointer, camera);
+
+  const intersects = raycaster.intersectObjects(imageMeshes, false);
+  if (intersects.length === 0) return;
+
+  const mesh = intersects[0].object;
+  const data = meshToData.get(mesh);
+  if (!data) return;
+
+  showWishPanel(data);
+});
+
+function showWishPanel(data) {
+  const sender =
+    (data.wishName && data.wishName.trim()) ||
+    data.ownerEmail ||
+    "익명";
+
+  const text =
+    (data.wishText && data.wishText.trim()) ||
+    "소원이 비어 있어요. 마음속으로 빌었나 봐요 ✨";
+
+  wishSenderEl.textContent = sender;
+  wishContentEl.textContent = text;
+
+  wishPanel.classList.remove("hidden");
+}
+
+function closeWishPanel() {
+  wishPanel.classList.add("hidden");
+}
+
+wishCloseBtn.addEventListener("click", closeWishPanel);
 
 // ----- 마우스 드래그 회전 / 줌 / 리사이즈 -----
 let isDragging = false;

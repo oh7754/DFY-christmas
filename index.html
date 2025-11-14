@@ -29,6 +29,23 @@
       </button>
     </div>
 
+    <!-- 소원 입력 -->
+    <div id="wishInputs" style="margin-top: 8px; font-size: 12px;">
+      <div style="opacity: 0.8; margin-bottom: 4px;">소원 적기 (선택)</div>
+      <input
+        id="wishName"
+        type="text"
+        placeholder="이름 또는 닉네임"
+        style="width: 100%; margin-bottom: 4px; padding: 4px 6px; border-radius: 6px; border: 1px solid #1f2937; background:#020617; color:#e5e7eb;"
+      />
+      <textarea
+        id="wishText"
+        rows="3"
+        placeholder="크리스마스 소원을 적어주세요 ✨"
+        style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid #1f2937; background:#020617; color:#e5e7eb; resize: vertical;"
+      ></textarea>
+    </div>
+
     <!-- 파일 업로드 (처음엔 막아둠) -->
     <input id="fileInput" type="file" multiple accept="image/*" disabled />
     <div id="count">걸린 사진: 0장</div>
@@ -41,10 +58,22 @@
     </div>
 </div>
 
-    <!-- three.js (r150.1, 예전 방식 지원) -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <!-- 소원 편지 패널 -->
+  <div id="wishPanel" class="wish-panel hidden">
+    <div class="wish-header">
+      <div class="wish-from">
+        From. <span id="wishSender"></span>
+      </div>
+      <button id="wishCloseBtn" class="secondary small">닫기</button>
+    </div>
+    <div class="wish-body">
+      <p id="wishContent"></p>
+    </div>
+  </div>
 
-    <!-- 내가 작성한 앱 코드 -->
-    <script type="module" src="main.js"></script>
+  <!-- three.js (r150.1, 예전 방식 지원) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <!-- 앱 코드 -->
+  <script type="module" src="main.js"></script>
 </body>
 </html>
