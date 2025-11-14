@@ -43,29 +43,39 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
-
 const imagesCol = collection(db, "treeImages");
 
 // 🔴 회사 도메인
 const ALLOWED_DOMAIN = "dfy.co.kr";
 
-// DOM 요소들
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const userInfoEl = document.getElementById("userInfo");
-const fileInput = document.getElementById("fileInput");
-const countEl = document.getElementById("count");
-const myImagesList = document.getElementById("myImagesList");
+// ===== DOM 요소들 =====
+// 프로필 / 사이드 레일
+const profileCircle = document.getElementById("profileCircle");
+const profileImage = document.getElementById("profileImage");
+const profileInitials = document.getElementById("profileInitials");
+const profileEmailEl = document.getElementById("profileEmail");
+const addWishBtn = document.getElementById("addWishBtn");
+const myWishListEl = document.getElementById("myWishList");
+
+// 소원 작성 모달
+const wishModal = document.getElementById("wishModal");
 const wishNameInput = document.getElementById("wishName");
 const wishTextInput = document.getElementById("wishText");
+const wishImageInput = document.getElementById("wishImageInput");
+const wishImageName = document.getElementById("wishImageName");
+const wishCancelBtn = document.getElementById("wishCancelBtn");
+const wishSubmitBtn = document.getElementById("wishSubmitBtn");
 
-// 편지 패널 요소
+// 전체 개수
+const countEl = document.getElementById("count");
+
+// 편지 패널
 const wishPanel = document.getElementById("wishPanel");
 const wishSenderEl = document.getElementById("wishSender");
 const wishContentEl = document.getElementById("wishContent");
 const wishCloseBtn = document.getElementById("wishCloseBtn");
 
-// 상태 변수
+// ===== 상태 =====
 let currentUser = null;
 const shownImageIds = new Set();
 let lastSnapshot = null;
@@ -74,66 +84,242 @@ let lastSnapshot = null;
 const imageMeshes = [];
 const meshToData = new Map();
 
-// 도메인 체크
+// ===== 유틸: 도메인 체크 =====
 function isAllowedDomain(email) {
   return email && email.endsWith("@" + ALLOWED_DOMAIN);
 }
 
-// ----- Auth 상태 관리 -----
+// ===== Auth 상태 관리 =====
 onAuthStateChanged(auth, (user) => {
   if (user && isAllowedDomain(user.email)) {
-    // ✅ 허용된 회사 계정
     currentUser = user;
-    userInfoEl.textContent = `로그인: ${user.email}`;
-    loginBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-    fileInput.disabled = false;
-    wishNameInput.disabled = false;
-    wishTextInput.disabled = false;
-  } else if (user && !isAllowedDomain(user.email)) {
-    // ❌ 다른 구글 계정
-    currentUser = null;
-    userInfoEl.textContent = `허용되지 않은 도메인입니다: ${user.email}`;
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "inline-block";
-    fileInput.disabled = true;
-    wishNameInput.disabled = true;
-    wishTextInput.disabled = true;
+
+    // 프로필 UI 업데이트
+    if (profileCircle) {
+      profileCircle.classList.remove("logged-out");
+    }
+
+    const email = user.email || "";
+    const name = user.displayName || email.split("@")[0] || "";
+
+    if (profileEmailEl) {
+      profileEmailEl.textContent = email;
+    }
+
+    if (user.photoURL && profileImage) {
+      profileImage.src = user.photoURL;
+      profileImage.style.display = "block";
+      if (profileInitials) profileInitials.style.display = "none";
+    } else if (profileInitials) {
+      const initials = name
+        .split(" ")
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+      profileInitials.textContent = initials || "?";
+      profileInitials.style.display = "flex";
+      if (profileImage) profileImage.style.display = "none";
+    }
+
+    if (addWishBtn) addWishBtn.disabled = false;
   } else {
-    // 로그아웃 상태
+    // 로그아웃 / 다른 도메인
     currentUser = null;
-    userInfoEl.textContent = "로그인 필요 (사내 구글 계정만 가능)";
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-    fileInput.disabled = true;
-    wishNameInput.disabled = true;
-    wishTextInput.disabled = true;
+
+    if (profileCircle) profileCircle.classList.add("logged-out");
+    if (profileImage) profileImage.style.display = "none";
+    if (profileInitials) {
+      profileInitials.style.display = "flex";
+      profileInitials.textContent = "?";
+    }
+    if (profileEmailEl) {
+      profileEmailEl.textContent = "로그인 필요";
+    }
+    if (addWishBtn) addWishBtn.disabled = true;
   }
 
-  renderMyImages(); // 내 이미지 리스트 다시 그리기
+  // 내 소원 코인 리스트 다시 그리기
+  renderMyWishList();
 });
 
-// 로그인 버튼
-loginBtn.addEventListener("click", async () => {
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (err) {
-    console.error("로그인 실패", err);
-    alert("로그인에 실패했습니다. 콘솔을 확인해주세요.");
+// 프로필 동그라미 클릭 → 로그인 / 로그아웃
+if (profileCircle) {
+  profileCircle.addEventListener("click", async () => {
+    try {
+      if (!currentUser) {
+        await signInWithPopup(auth, provider);
+      } else {
+        const ok = confirm("이 계정에서 로그아웃 할까요?");
+        if (ok) {
+          closeWishPanel();
+          await signOut(auth);
+        }
+      }
+    } catch (err) {
+      console.error("로그인/로그아웃 실패", err);
+      alert("로그인/로그아웃 중 오류가 발생했습니다.");
+    }
+  });
+}
+
+// ===== 소원 작성 모달 열기/닫기 =====
+function openWishModal() {
+  if (!currentUser || !isAllowedDomain(currentUser.email)) {
+    alert("사내 구글 계정으로 로그인해야 소원을 올릴 수 있습니다.");
+    return;
   }
-});
+  if (!wishModal) return;
 
-// 로그아웃 버튼
-logoutBtn.addEventListener("click", async () => {
-  try {
-    await signOut(auth);
-    closeWishPanel();
-  } catch (err) {
-    console.error("로그아웃 실패", err);
+  if (wishNameInput && !wishNameInput.value) {
+    // 기본값: 이름 없으면 이메일 앞부분
+    const email = currentUser.email || "";
+    wishNameInput.value = currentUser.displayName || email.split("@")[0] || "";
   }
-});
 
-// ----- Three.js 씬 설정 -----
+  if (wishTextInput) wishTextInput.value = "";
+  if (wishImageInput) wishImageInput.value = "";
+  if (wishImageName) wishImageName.textContent = "선택된 파일 없음";
+
+  wishModal.classList.remove("hidden");
+}
+
+function closeWishModal() {
+  if (!wishModal) return;
+  wishModal.classList.add("hidden");
+}
+
+if (addWishBtn) addWishBtn.addEventListener("click", openWishModal);
+if (wishCancelBtn) wishCancelBtn.addEventListener("click", closeWishModal);
+
+// 배경 클릭으로 닫기
+if (wishModal) {
+  const backdrop = wishModal.querySelector(".modal-backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", closeWishModal);
+  }
+}
+
+// 파일 선택시 파일 이름 표시
+if (wishImageInput) {
+  wishImageInput.addEventListener("change", () => {
+    const f = wishImageInput.files[0];
+    if (wishImageName) {
+      wishImageName.textContent = f ? f.name : "선택된 파일 없음";
+    }
+  });
+}
+
+// ===== 이미지 리사이즈 & 압축 =====
+function compressImage(file) {
+  const MAX_WIDTH = 1920;
+  const MAX_HEIGHT = 1920;
+  const MAX_MB = 1.5;
+
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB <= MAX_MB) {
+    return Promise.resolve(file);
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      const widthRatio = MAX_WIDTH / width;
+      const heightRatio = MAX_HEIGHT / height;
+      const ratio = Math.min(widthRatio, heightRatio, 1);
+
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            return reject(new Error("이미지 압축 실패"));
+          }
+          const compressedFile = new File(
+            [blob],
+            file.name.replace(/\.\w+$/, ".jpg"),
+            { type: "image/jpeg" }
+          );
+          resolve(compressedFile);
+        },
+        "image/jpeg",
+        0.8
+      );
+    };
+
+    img.onerror = reject;
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
+
+// ===== 업로드 로직 (모달에서 호출) =====
+async function uploadAndRegister(file, wishName, wishText) {
+  if (!currentUser) {
+    alert("이미지를 올리려면 먼저 로그인 해주세요!");
+    return;
+  }
+
+  const filePath = `uploads/${currentUser.uid}/${Date.now()}_${file.name}`;
+  const storageRef = ref(storage, filePath);
+  const snapshot = await uploadBytes(storageRef, file);
+  const downloadURL = await getDownloadURL(snapshot.ref);
+
+  await addDoc(imagesCol, {
+    url: downloadURL,
+    path: filePath,
+    ownerUid: currentUser.uid,
+    ownerEmail: currentUser.email,
+    originalName: file.name,
+    wishName: wishName || "",
+    wishText: wishText || "",
+    createdAt: serverTimestamp(),
+  });
+}
+
+// 모달 "소원 올리기" 버튼
+if (wishSubmitBtn) {
+  wishSubmitBtn.addEventListener("click", async () => {
+    if (!wishImageInput) return;
+
+    const file = wishImageInput.files[0];
+    if (!file) {
+      alert("이미지를 선택해 주세요.");
+      return;
+    }
+
+    const name = (wishNameInput && wishNameInput.value.trim()) || "";
+    const text = (wishTextInput && wishTextInput.value.trim()) || "";
+
+    try {
+      const processed = await compressImage(file);
+      await uploadAndRegister(processed, name, text);
+      closeWishModal();
+    } catch (err) {
+      console.error("소원 업로드 실패", err);
+      alert("소원을 올리는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
+    }
+  });
+}
+
+// ===== Three.js 씬 설정 =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020617);
 
@@ -223,6 +409,7 @@ const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
 function updateCount(num) {
+  if (!countEl) return;
   countEl.textContent = `걸린 사진: ${num}장`;
 }
 
@@ -243,7 +430,6 @@ function getRandomPositionOnTree() {
 }
 
 // --- 이미지 한 장을 트리에 추가 ---
-// docId, data 를 같이 받아서 meshToData 에 저장
 function addImageToTree(docId, data) {
   const texLoader = new THREE.TextureLoader();
   texLoader.load(
@@ -270,10 +456,7 @@ function addImageToTree(docId, data) {
       treeGroup.add(plane);
 
       imageMeshes.push(plane);
-      meshToData.set(plane, {
-        ...data,
-        id: docId,
-      });
+      meshToData.set(plane, { ...data, id: docId });
     },
     undefined,
     (err) => {
@@ -282,224 +465,103 @@ function addImageToTree(docId, data) {
   );
 }
 
-// --- Firestore에서 실시간으로 이미지 목록 가져오기 ---
+// ===== Firestore 실시간 구독 =====
 const q = query(imagesCol, orderBy("createdAt", "asc"));
 onSnapshot(q, (snapshot) => {
   console.log("Firestore snapshot size:", snapshot.size);
   lastSnapshot = snapshot;
 
-  snapshot.docs.forEach((docSnap) => {
-    const id = docSnap.id;
-    if (shownImageIds.has(id)) return;
-    shownImageIds.add(id);
+  snapshot.docChanges().forEach((change) => {
+    const id = change.doc.id;
+    const data = change.doc.data();
 
-    const data = docSnap.data();
-    if (data.url) {
-      console.log("addImageFromDoc:", id, data.url);
+    if (change.type === "added") {
+      if (shownImageIds.has(id) || !data.url) return;
+      shownImageIds.add(id);
       addImageToTree(id, data);
+    } else if (change.type === "removed") {
+      shownImageIds.delete(id);
+
+      // 메쉬 제거
+      const entry = [...meshToData.entries()].find(
+        ([, value]) => value.id === id
+      );
+      if (entry) {
+        const [mesh] = entry;
+        treeGroup.remove(mesh);
+        meshToData.delete(mesh);
+        const idx = imageMeshes.indexOf(mesh);
+        if (idx >= 0) imageMeshes.splice(idx, 1);
+      }
     }
   });
 
   updateCount(snapshot.size);
-  renderMyImages();
+  renderMyWishList();
 });
 
-// --- 파일 업로드 → Storage에 올리고 URL을 Firestore에 저장 ---
-async function uploadAndRegister(file) {
-  if (!currentUser) {
-    alert("이미지를 올리려면 먼저 로그인 해주세요!");
-    return;
-  }
+// ===== “내 소원” 코인 리스트 + 삭제 =====
+function renderMyWishList() {
+  if (!myWishListEl) return;
 
-  const filePath = `uploads/${currentUser.uid}/${Date.now()}_${file.name}`;
-  const storageRef = ref(storage, filePath);
-  const snapshot = await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(snapshot.ref);
-
-  const wishName = (wishNameInput.value || "").trim();
-  const wishText = (wishTextInput.value || "").trim();
-
-  await addDoc(imagesCol, {
-    url: downloadURL,
-    path: filePath, // 삭제할 때 쓸 경로
-    ownerUid: currentUser.uid,
-    ownerEmail: currentUser.email,
-    originalName: file.name,
-    wishName,
-    wishText,
-    createdAt: serverTimestamp(),
-  });
-
-  // 업로드 후 소원 입력칸은 비워두고, 이름은 유지할지 말지는 취향인데
-  // 일단 이름은 유지, 소원만 초기화
-  wishTextInput.value = "";
-}
-
-// ===== 이미지 리사이즈 & 압축 =====
-function compressImage(file) {
-  const MAX_WIDTH = 1920;   // 최대 가로
-  const MAX_HEIGHT = 1920;  // 최대 세로
-  const MAX_MB = 1.5;       // 이 크기보다 작으면 그냥 그대로 업로드
-
-  // 이미 충분히 작으면 그대로 사용
-  const sizeMB = file.size / (1024 * 1024);
-  if (sizeMB <= MAX_MB) {
-    return Promise.resolve(file);
-  }
-
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      img.src = e.target.result;
-    };
-
-    img.onload = () => {
-      let width = img.width;
-      let height = img.height;
-
-      // 비율 유지하면서 최대 크기 안으로 줄이기
-      const widthRatio = MAX_WIDTH / width;
-      const heightRatio = MAX_HEIGHT / height;
-      const ratio = Math.min(widthRatio, heightRatio, 1); // 1보다 크게는 안 키움
-
-      width = Math.round(width * ratio);
-      height = Math.round(height * ratio);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // JPEG로 압축 (품질 0.8 정도)
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            return reject(new Error("이미지 압축 실패"));
-          }
-          const compressedFile = new File(
-            [blob],
-            file.name.replace(/\.\w+$/, ".jpg"), // 확장자를 jpg 로
-            { type: "image/jpeg" }
-          );
-          resolve(compressedFile);
-        },
-        "image/jpeg",
-        0.8
-      );
-    };
-
-    img.onerror = (err) => reject(err);
-    reader.onerror = (err) => reject(err);
-
-    reader.readAsDataURL(file);
-  });
-}
-
-
-// 업로드 인풋
-fileInput.addEventListener("change", (event) => {
-  const files = event.target.files;
-  if (!files || !files.length) return;
-
-  const user = auth.currentUser;
-  if (!user || !isAllowedDomain(user.email)) {
-    alert("사내 구글 계정으로 로그인해야 업로드할 수 있습니다.");
-    fileInput.value = "";
-    return;
-  }
-
-  Array.from(files).forEach(async (file) => {
-    if (!file.type.startsWith("image/")) return;
-
-    try {
-      // 1) 먼저 리사이즈 & 압축
-      const processed = await compressImage(file);
-
-      // 2) 압축된 파일 업로드
-      await uploadAndRegister(processed);
-    } catch (err) {
-      console.error("이미지 처리/업로드 실패", err);
-    }
-  });
-
-  fileInput.value = "";
-});
-
-
-// ----- “내가 올린 사진” 리스트 + 삭제 -----
-function renderMyImages() {
-  if (!myImagesList) return;
-
-  myImagesList.innerHTML = "";
+  myWishListEl.innerHTML = "";
 
   if (!currentUser) {
-    myImagesList.innerHTML =
-      '<div style="opacity:0.6;">로그인 후 확인 가능합니다.</div>';
+    myWishListEl.innerHTML =
+      '<div style="opacity:0.6; font-size:12px;">로그인 후 확인 가능합니다.</div>';
     return;
   }
-
   if (!lastSnapshot) {
-    myImagesList.innerHTML =
-      '<div style="opacity:0.6;">불러오는 중...</div>';
+    myWishListEl.innerHTML =
+      '<div style="opacity:0.6; font-size:12px;">불러오는 중...</div>';
     return;
   }
 
-  const myDocs = lastSnapshot.docs.filter((docSnap) => {
-    const data = docSnap.data();
-    return data.ownerUid === currentUser.uid;
-  });
+  const myDocs = lastSnapshot.docs.filter(
+    (docSnap) => docSnap.data().ownerUid === currentUser.uid
+  );
 
   if (!myDocs.length) {
-    myImagesList.innerHTML =
-      '<div style="opacity:0.6;">아직 올린 사진이 없습니다.</div>';
+    myWishListEl.innerHTML =
+      '<div style="opacity:0.6; font-size:12px;">아직 올린 소원이 없습니다.</div>';
     return;
   }
 
   myDocs.forEach((docSnap) => {
     const data = docSnap.data();
+    const id = docSnap.id;
 
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.justifyContent = "space-between";
-    row.style.gap = "4px";
-    row.style.marginBottom = "2px";
+    const coin = document.createElement("div");
+    coin.className = "wish-coin";
 
-    const nameSpan = document.createElement("span");
-    const labelParts = [];
-    if (data.originalName) labelParts.push(data.originalName);
-    if (data.wishName) labelParts.push(`(${data.wishName})`);
-    nameSpan.textContent = labelParts.join(" ");
-    nameSpan.style.flex = "1";
-    nameSpan.style.whiteSpace = "nowrap";
-    nameSpan.style.overflow = "hidden";
-    nameSpan.style.textOverflow = "ellipsis";
+    // 코인 클릭 → 편지 패널 열기
+    coin.addEventListener("click", () => {
+      showWishPanel({
+        wishName: data.wishName,
+        ownerEmail: data.ownerEmail,
+        wishText: data.wishText,
+      });
+    });
 
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "삭제";
-    delBtn.classList.add("secondary", "small");
+    const dot = document.createElement("div");
+    dot.className = "delete-dot";
+    dot.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleDeleteImage(id, data);
+    });
 
-    delBtn.addEventListener("click", () =>
-      handleDeleteImage(docSnap.id, data)
-    );
-
-    row.appendChild(nameSpan);
-    row.appendChild(delBtn);
-    myImagesList.appendChild(row);
+    coin.appendChild(dot);
+    myWishListEl.appendChild(coin);
   });
 }
 
 async function handleDeleteImage(docId, data) {
   if (!currentUser || data.ownerUid !== currentUser.uid) {
-    alert("내가 올린 사진만 삭제할 수 있습니다.");
+    alert("내가 올린 소원만 삭제할 수 있습니다.");
     return;
   }
 
-  const ok = confirm("정말 이 사진을 삭제할까요?");
+  const ok = confirm("정말 이 소원을 삭제할까요?");
   if (!ok) return;
 
   try {
@@ -507,14 +569,14 @@ async function handleDeleteImage(docId, data) {
       const fileRef = ref(storage, data.path);
       await deleteObject(fileRef);
     }
-    await deleteDoc(doc(imagesCol, docId));
+    await deleteDoc(doc(db, "treeImages", docId));
   } catch (err) {
     console.error("삭제 실패", err);
     alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
   }
 }
 
-// ----- 트리에 걸린 이미지 클릭 → 소원 편지 띄우기 -----
+// ===== 트리에 걸린 이미지 클릭 → 소원 편지 패널 =====
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
@@ -537,6 +599,8 @@ renderer.domElement.addEventListener("click", (event) => {
 });
 
 function showWishPanel(data) {
+  if (!wishPanel || !wishSenderEl || !wishContentEl) return;
+
   const sender =
     (data.wishName && data.wishName.trim()) ||
     data.ownerEmail ||
@@ -553,12 +617,15 @@ function showWishPanel(data) {
 }
 
 function closeWishPanel() {
+  if (!wishPanel) return;
   wishPanel.classList.add("hidden");
 }
 
-wishCloseBtn.addEventListener("click", closeWishPanel);
+if (wishCloseBtn) {
+  wishCloseBtn.addEventListener("click", closeWishPanel);
+}
 
-// ----- 마우스 드래그 회전 / 줌 / 리사이즈 -----
+// ===== 마우스 드래그 회전 / 줌 / 리사이즈 =====
 let isDragging = false;
 let prevX = 0;
 let prevY = 0;
@@ -618,7 +685,7 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ----- 애니메이션 루프 -----
+// ===== 애니메이션 루프 =====
 let lastTime = 0;
 function animate(time) {
   requestAnimationFrame(animate);

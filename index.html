@@ -56,6 +56,51 @@
           <!-- 자바스크립트에서 채워 넣음 -->
       </div>
     </div>
+
+    <!-- 오른쪽 사이드 레일 -->
+  <div id="sideRail">
+    <!-- 1. 로그인된 계정 프로필 -->
+    <div id="profileCircle" class="circle profile-circle">
+      <img id="profileImage" alt="" />
+      <span id="profileInitials"></span>
+      <span id="profileEmail"></span>
+    </div>
+
+    <!-- 2. 소원 추가 버튼 -->
+    <button id="addWishBtn" class="circle add-wish-circle">
+      <div class="add-wish-plus">+</div>
+      <div class="add-wish-label">(소원 추가)</div>
+    </button>
+
+    <!-- 3. 내가 올린 소원들 (코인 리스트) -->
+    <div id="myWishList">
+      <!-- JS 에서 채워 넣음 -->
+    </div>
+  </div>
+
+  <!-- 소원 작성 + 이미지 업로드 팝업 -->
+  <div id="wishModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2>소원 적기</h2>
+      <p class="modal-desc">
+        소원을 적고 이미지를 함께 올려보세요.
+      </p>
+      <textarea id="wishText" rows="3"
+        placeholder="올해 이루어졌으면 하는 소원을 적어주세요."></textarea>
+
+      <label class="file-label">
+        이미지 선택
+        <input id="wishImageInput" type="file" accept="image/*" />
+      </label>
+      <div id="wishImageName" class="file-name">선택된 파일 없음</div>
+
+      <div class="modal-buttons">
+        <button id="wishCancelBtn" class="secondary">닫기</button>
+        <button id="wishSubmitBtn">소원 올리기</button>
+      </div>
+    </div>
+  </div>
 </div>
 
   <!-- 소원 편지 패널 -->

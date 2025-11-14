@@ -136,3 +136,212 @@ button.small {
   padding: 2px 6px;
   font-size: 11px;
 }
+
+/* ===== 오른쪽 세로 레일 ===== */
+#sideRail {
+  position: fixed;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+/* 공통 동그라미 버튼 */
+.circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #020617;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  color: #e5e7eb;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* 1. 프로필 동그라미 */
+.profile-circle {
+  position: relative;
+  background: radial-gradient(circle at 30% 30%, #1e293b, #020617);
+  overflow: hidden;
+}
+
+#profileImage {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: none; /* 기본은 숨김, 사진 있을 때만 보이게 */
+}
+
+#profileInitials {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 24px;
+  background: #1f2937;
+}
+
+#profileEmail {
+  margin-top: 76px;
+  font-size: 11px;
+  opacity: 0.8;
+  text-align: center;
+}
+
+/* 로그인 안 되었을 때 */
+.profile-circle.logged-out #profileEmail {
+  margin-top: 0;
+}
+
+/* 2. 소원 추가 버튼 */
+.add-wish-circle {
+  background: radial-gradient(circle at 30% 30%, #111827, #020617);
+}
+
+.add-wish-plus {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.add-wish-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* 3. 내 소원 리스트 (코인들) */
+#myWishList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 코인 하나 */
+.wish-coin {
+  position: relative;
+  width: 90px;
+  height: 60px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #fefce8 0, #fefce8 40%, #111827 41%, #111827 60%, #facc15 61%, #b45309 100%);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+  transform: rotate(-18deg);
+  cursor: pointer;
+}
+
+/* 빨간 삭제 점 */
+.wish-coin .delete-dot {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #020617;
+  cursor: pointer;
+}
+
+/* 모달 공통 */
+.modal.hidden {
+  display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15,23,42,0.8);
+  backdrop-filter: blur(10px);
+}
+
+.modal-content {
+  position: relative;
+  width: 320px;
+  max-width: 90%;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: #020617;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+  z-index: 1;
+}
+
+.modal-content h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.modal-desc {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-bottom: 10px;
+}
+
+#wishText {
+  width: 100%;
+  background: #020617;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+  padding: 8px 10px;
+  color: #e5e7eb;
+  font-size: 13px;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.file-label input {
+  display: none;
+}
+
+.file-name {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-buttons button {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
