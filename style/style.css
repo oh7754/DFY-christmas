@@ -27,6 +27,7 @@ body {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   z-index: 10;
   max-width: 260px;
+  display: none;
 }
 
 #ui h1 {
@@ -140,8 +141,8 @@ button.small {
 /* ===== 오른쪽 세로 레일 ===== */
 #sideRail {
   position: fixed;
-  right: 12px;
-  top: 12px;
+  right: 32px;
+  top: 32px;
   /* transform: translateY(-50%); */
   display: flex;
   flex-direction: column;
@@ -149,7 +150,7 @@ button.small {
   gap: 32px;
   z-index: 20;
   pointer-events: auto;
-  background-color: #ef4444;
+  /* background-color: #ef4444; */
 }
 
 /* 공통 동그라미 버튼 */
@@ -164,7 +165,6 @@ button.small {
   justify-content: center;
   align-items: center;
   background: #020617;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
   color: #e5e7eb;
   font-size: 13px;
   cursor: pointer;
@@ -173,7 +173,7 @@ button.small {
 /* 1. 프로필 동그라미 */
 .profile-circle {
   position: relative;
-  background: radial-gradient(circle at 30% 30%, #1e293b, #020617);
+  background: #020617;
   overflow: hidden;
 }
 
@@ -198,12 +198,13 @@ button.small {
   background: #1f2937;
 }
 
-#profileEmail {
+/* #profileEmail {
+    position: fixed;
   margin-top: 76px;
   font-size: 11px;
   opacity: 0.8;
   text-align: center;
-}
+} */
 
 /* 로그인 안 되었을 때 */
 .profile-circle.logged-out #profileEmail {
