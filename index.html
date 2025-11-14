@@ -84,7 +84,14 @@
     <!-- 파일 업로드 (처음엔 막아둠) -->
     <input id="fileInput" type="file" multiple accept="image/*" disabled />
     <div id="count">걸린 사진: 0장</div>
-  </div>
+
+      <div id="myImages" style="margin-top:10px; font-size:12px;">
+        <div style="opacity:0.7;">내가 올린 사진</div>
+        <div id="myImagesList" style="margin-top:4px; max-height:120px; overflow:auto;">
+          <!-- 자바스크립트에서 채워 넣음 -->
+      </div>
+    </div>
+</div>
 
   <!-- three.js (r150.1, 예전 방식 지원) -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -99,13 +106,16 @@
     onSnapshot,
     query,
     orderBy,
-    serverTimestamp
+    serverTimestamp,
+    deleteDoc,
+    doc
   } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js';
   import {
     getStorage,
     ref,
     uploadBytes,
-    getDownloadURL
+    getDownloadURL,
+    deleteObject
   } from 'https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js';
   import {
     getAuth,
@@ -132,22 +142,162 @@
   const storage = getStorage(app);
   const imagesCol = collection(db, "treeImages");
 
-  // --- Auth 초기화 ---
+  // === Auth 설정 ===
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
 
-  // 🔴 여기를 실제 회사 이메일 도메인으로 바꿔줘
-  // 예: const ALLOWED_DOMAIN = "mycompany.co.kr";
+  // 회사 도메인
   const ALLOWED_DOMAIN = "dfy.co.kr";
-
   function isAllowedDomain(email) {
     return email && email.endsWith("@" + ALLOWED_DOMAIN);
   }
 
-
-  // 이미 트리에 추가한 문서 id 기억용
+  // 이미 트리에 올려진 문서 id 기억
   const shownImageIds = new Set();
+  // 문서 id → { mesh, data } 맵
+  const imageMap = new Map();
+  // 현재 로그인 유저
+  let currentUser = null;
 
+  // ===== “내가 올린 사진” UI 렌더링 =====
+  function renderMyImagesList() {
+    const listEl = document.getElementById("myImagesList");
+    if (!listEl) return;
+
+    listEl.innerHTML = "";
+
+    if (!currentUser) {
+      listEl.innerHTML = `<div style="opacity:0.6;">로그인하면 내가 올린 사진을 볼 수 있어요.</div>`;
+      return;
+    }
+
+    const myItems = [];
+    imageMap.forEach((entry, id) => {
+      if (entry.data.ownerUid === currentUser.uid) {
+        myItems.push({ id, ...entry.data });
+      }
+    });
+
+    if (!myItems.length) {
+      listEl.innerHTML = `<div style="opacity:0.6;">아직 올린 사진이 없어요.</div>`;
+      return;
+    }
+
+    myItems.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+
+    myItems.forEach((item) => {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.marginTop = "4px";
+      row.style.gap = "6px";
+
+      const thumb = document.createElement("img");
+      thumb.src = item.url;
+      thumb.style.width = "32px";
+      thumb.style.height = "32px";
+      thumb.style.objectFit = "cover";
+      thumb.style.borderRadius = "4px";
+
+      const emailSpan = document.createElement("span");
+      emailSpan.textContent = item.ownerEmail || "";
+      emailSpan.style.flex = "1";
+      emailSpan.style.fontSize = "10px";
+      emailSpan.style.opacity = "0.7";
+
+      const btn = document.createElement("button");
+      btn.textContent = "삭제";
+      btn.style.fontSize = "10px";
+      btn.style.padding = "2px 6px";
+      btn.style.borderRadius = "6px";
+      btn.style.border = "none";
+      btn.style.cursor = "pointer";
+      btn.style.background = "#ef4444";
+      btn.style.color = "white";
+
+      btn.addEventListener("click", () => {
+        if (confirm("이 사진을 트리에서 지울까요?")) {
+          deleteMyImage(item.id, item.path);
+        }
+      });
+
+      row.appendChild(thumb);
+      row.appendChild(emailSpan);
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    });
+  }
+
+  // ===== three.js용 메쉬 생성/삭제 =====
+  function createMeshForDoc(docId, data, treeGroup, getRandomPositionOnTree) {
+    const texLoader = new THREE.TextureLoader();
+    texLoader.load(
+      data.url,
+      (texture) => {
+        const aspect = texture.image.width / texture.image.height;
+        const baseHeight = 1.0;
+        const width = baseHeight * aspect;
+        const height = baseHeight;
+
+        const geo = new THREE.PlaneGeometry(width, height);
+        const mat = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          side: THREE.DoubleSide
+        });
+        const plane = new THREE.Mesh(geo, mat);
+
+        const { position } = getRandomPositionOnTree();
+        plane.position.copy(position);
+        plane.lookAt(new THREE.Vector3(0, position.y, 0));
+        plane.rotateY(Math.PI);
+
+        treeGroup.add(plane);
+        shownImageIds.add(docId);
+        imageMap.set(docId, { mesh: plane, data });
+        renderMyImagesList();
+      },
+      undefined,
+      (err) => {
+        console.error("텍스처 로드 오류", err);
+      }
+    );
+  }
+
+  function removeMeshForDoc(docId, treeGroup) {
+    const entry = imageMap.get(docId);
+    if (!entry) return;
+    treeGroup.remove(entry.mesh);
+    entry.mesh.geometry.dispose();
+    if (entry.mesh.material.map) entry.mesh.material.map.dispose();
+    entry.mesh.material.dispose();
+    imageMap.delete(docId);
+    shownImageIds.delete(docId);
+    renderMyImagesList();
+  }
+
+  // ===== 실제 삭제 동작 =====
+  async function deleteMyImage(docId, path) {
+    const entry = imageMap.get(docId);
+    if (!entry || !currentUser || entry.data.ownerUid !== currentUser.uid) {
+      alert("내가 올린 사진만 삭제할 수 있습니다.");
+      return;
+    }
+
+    try {
+      if (path) {
+        const storageRef = ref(storage, path);
+        await deleteObject(storageRef);
+      }
+      await deleteDoc(doc(imagesCol, docId));
+      // onSnapshot의 removed 이벤트에서 메쉬/리스트 정리됨
+    } catch (err) {
+      console.error("삭제 실패:", err);
+      alert("삭제 중 오류가 발생했어요. 콘솔을 확인해 주세요.");
+    }
+  }
+
+  // ===== 메인 로직 =====
   window.addEventListener("load", () => {
     console.log("페이지 로드됨");
 
@@ -159,24 +309,25 @@
     // 로그인 상태 변화 감지
     onAuthStateChanged(auth, (user) => {
       if (user && isAllowedDomain(user.email)) {
-        // ✅ 사내 계정으로 로그인
+        currentUser = user;
         userInfoEl.textContent = `로그인: ${user.email}`;
         loginBtn.style.display  = "none";
         logoutBtn.style.display = "inline-block";
         fileInput.disabled      = false;
       } else if (user && !isAllowedDomain(user.email)) {
-        // ❌ 구글이긴 한데 다른 도메인
+        currentUser = null;
         userInfoEl.textContent = `허용되지 않은 도메인입니다: ${user.email}`;
         loginBtn.style.display  = "inline-block";
         logoutBtn.style.display = "inline-block";
         fileInput.disabled      = true;
       } else {
-        // 로그인 안 된 상태
+        currentUser = null;
         userInfoEl.textContent = "로그인 필요 (사내 구글 계정만 가능)";
         loginBtn.style.display  = "inline-block";
         logoutBtn.style.display = "none";
         fileInput.disabled      = true;
       }
+      renderMyImagesList();
     });
 
     // 로그인 버튼
@@ -198,12 +349,7 @@
       }
     });
 
-    // 🔽 이 아래부터는 기존 three.js / Firestore 코드 그대로 유지
-    // const scene = new THREE.Scene(); ...
-
-
-    // === 여기부터 기존 three.js / Firestore 코드 ===
-
+    // === three.js 씬 구성 ===
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020617);
 
@@ -313,68 +459,44 @@
       return { position };
     }
 
-    // --- 이미지 한 장을 트리에 추가 ---
-    function addImageToTree(imageUrl) {
-      const texLoader = new THREE.TextureLoader();
-      texLoader.load(
-        imageUrl,
-        (texture) => {
-          const aspect = texture.image.width / texture.image.height;
-          const baseHeight = 1.0;
-          const width = baseHeight * aspect;
-          const height = baseHeight;
-
-          const geo = new THREE.PlaneGeometry(width, height);
-          const mat = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: true,
-            side: THREE.DoubleSide
-          });
-          const plane = new THREE.Mesh(geo, mat);
-
-          const { position } = getRandomPositionOnTree();
-          plane.position.copy(position);
-          plane.lookAt(new THREE.Vector3(0, position.y, 0));
-          plane.rotateY(Math.PI);
-
-          treeGroup.add(plane);
-        },
-        undefined,
-        (err) => {
-          console.error("텍스처 로드 오류", err);
-        }
-      );
-    }
-
     // --- Firestore에서 실시간으로 이미지 목록 가져오기 ---
     const q = query(imagesCol, orderBy("createdAt", "asc"));
     onSnapshot(q, (snapshot) => {
       console.log("Firestore snapshot size:", snapshot.size);
 
-      snapshot.docs.forEach((doc) => {
-        const id = doc.id;
-        if (shownImageIds.has(id)) return;
-        shownImageIds.add(id);
+      snapshot.docChanges().forEach((change) => {
+        const id = change.doc.id;
+        const data = change.doc.data();
 
-        const data = doc.data();
-        if (data.url) {
-          console.log("addImageFromDoc:", id, data.url);
-          addImageToTree(data.url);
+        if (change.type === "added") {
+          if (!shownImageIds.has(id)) {
+            createMeshForDoc(id, data, treeGroup, getRandomPositionOnTree);
+          }
+        } else if (change.type === "removed") {
+          removeMeshForDoc(id, treeGroup);
         }
       });
 
       updateCount(snapshot.size);
     });
 
-    // --- 파일 업로드 → Storage에 올리고 URL을 Firestore에 저장 ---
+    // --- 파일 업로드 → Storage + Firestore ---
     async function uploadAndRegister(file) {
-      const filePath = `uploads/${Date.now()}_${file.name}`;
+      if (!currentUser) {
+        alert("이미지를 올리려면 먼저 로그인 해주세요!");
+        return;
+      }
+
+      const filePath = `uploads/${currentUser.uid}/${Date.now()}_${file.name}`;
       const storageRef = ref(storage, filePath);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
 
       await addDoc(imagesCol, {
         url: downloadURL,
+        path: filePath,
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email,
         createdAt: serverTimestamp()
       });
     }
@@ -383,7 +505,6 @@
       const files = event.target.files;
       if (!files || !files.length) return;
 
-      // 마지막 방어: 실제로 로그인 + 회사 도메인인지 확인
       const user = auth.currentUser;
       if (!user || !isAllowedDomain(user.email)) {
         alert("사내 구글 계정으로 로그인해야 업로드할 수 있습니다.");
@@ -400,7 +521,6 @@
 
       fileInput.value = "";
     });
-
 
     // === 드래그 회전 / 휠 줌, 리사이즈, 애니메이션 루프 ===
     let isDragging = false;
@@ -486,5 +606,6 @@
     animate(0);
   });
   </script>
+
 </body>
 </html>
