@@ -1,280 +1,370 @@
-/* 공통 기본값 */
+/* ===== 리셋 & 기본 ===== */
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
-/* 전체 배경 + 폰트 */
+html,
 body {
   margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   background: #020617;
-  color: #f9fafb;
+  color: #e5e7eb;
   overflow: hidden;
 }
 
-/* 왼쪽 상단 UI 카드 */
-#ui {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  padding: 12px 16px;
-  background: rgba(15, 23, 42, 0.9);
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  z-index: 10;
-  max-width: 260px;
-  display: none;
-}
-
-#ui h1 {
-  font-size: 16px;
-  margin-bottom: 8px;
-}
-
-/* 업로드 인풋, 카운트 텍스트 */
-#fileInput {
-  margin-top: 6px;
-  font-size: 12px;
-}
-
-#count {
-  margin-top: 6px;
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-/* 버튼 기본 스타일 */
-button {
-  border: none;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  background: #22c55e;
-  color: #022c22;
-}
-
-/* 보조 버튼 (로그아웃 등) */
-button.secondary {
-  background: #0f172a;
-  color: #e5e7eb;
-  border: 1px solid #1f2937;
-}
-
-/* 비활성 버튼 */
-button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-/* 캔버스(three.js) */
+/* THREE 캔버스는 body 전체 */
 canvas {
   display: block;
 }
 
-/* 내 이미지 리스트 영역 (향후 스타일 확장용) */
-#myImages {
-  margin-top: 10px;
+/* 공통 버튼 스타일 */
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.btn.primary {
+  background: #22c55e;
+  color: #022c22;
+}
+
+.btn.primary:hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+}
+
+.btn.secondary {
+  background: #0b1120;
+  border: 1px solid #1f2937;
+  color: #e5e7eb;
+}
+
+.btn.secondary:hover {
+  background: #020617;
+}
+
+.btn.small {
+  padding: 4px 12px;
   font-size: 12px;
 }
 
-#myImagesList {
-  margin-top: 4px;
-  max-height: 120px;
-  overflow: auto;
+.link-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: #e5e7eb;
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
-/* 소원 편지 패널 */
-.wish-panel {
+/* ===== 상단 프로필 + 햄버거 버튼 ===== */
+.top-bar {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
-  width: 260px;
-  max-height: 260px;
-  padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.98);
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  backdrop-filter: blur(10px);
-  font-size: 12px;
+  top: 20px;
+  left: 24px;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.wish-header {
+.profile-circle,
+.menu-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #111827, #020617);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+
+/* 프로필 이니셜 / 이미지 */
+.profile-circle span {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.profile-image {
+  position: absolute;
+  inset: 4px;
+  width: auto;
+  height: auto;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* 햄버거 아이콘 */
+.menu-circle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  margin: 2px 0;
+}
+
+/* ===== 사이드 패널 (햄버거 열면) ===== */
+
+.side-panel {
+  position: fixed;
+  top: 96px;
+  left: 24px;
+  max-width: 680px;
+  width: calc(100% - 48px);
+  background: rgba(15, 23, 42, 0.96);
+  border-radius: 32px;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(16px);
+  padding: 18px 20px 16px;
+  z-index: 19;
+
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.side-panel.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.side-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 계정 정보 pill */
+.account-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 999px;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid rgba(30, 64, 175, 0.6);
+}
+
+.account-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #1d4ed8, #020617);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e5e7eb;
+  font-weight: 600;
+  font-size: 20px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-email {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.account-sub {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.account-actions {
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pill-close {
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(15, 23, 42, 0.9);
+  color: #9ca3af;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 패널 섹션 & 리스트 */
+.panel-section {
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 24px;
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(30, 64, 175, 0.5);
+}
+
+.panel-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
-.wish-from {
+.panel-title {
+  font-size: 13px;
   font-weight: 500;
-  color: #e5e7eb;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9ca3af;
 }
 
-.wish-body {
-  margin-top: 4px;
-  padding: 8px 10px;
-  background: radial-gradient(circle at top left, #22c55e33, #020617);
-  border-radius: 8px;
-  border: 1px dashed rgba(148, 163, 184, 0.5);
-  color: #e5e7eb;
-  line-height: 1.5;
+/* 소원 리스트 */
+.wish-list {
+  max-height: 220px;
   overflow-y: auto;
-  max-height: 170px;
-}
-
-button.small {
-  padding: 2px 6px;
-  font-size: 11px;
-}
-
-/* ===== 오른쪽 세로 레일 ===== */
-#sideRail {
-  position: fixed;
-  right: 32px;
-  top: 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-  z-index: 20;
-  pointer-events: auto;
-  /* background-color: #ef4444; */
-}
-
-/* 공통 동그라미 버튼 */
-.circle {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: none;
-  outline: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: #020617;
-  color: #e5e7eb;
+  padding-right: 4px;
   font-size: 13px;
-  cursor: pointer;
 }
 
-/* 1. 프로필 동그라미 */
-.profile-circle {
-  position: relative;
-  background: #020617;
+.wish-list-empty {
+  opacity: 0.7;
+}
+
+/* 소원 한 줄 카드 */
+.wish-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 6px;
+  border-radius: 16px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.wish-row:hover {
+  background: rgba(15, 23, 42, 0.9);
+  transform: translateY(-1px);
+}
+
+.wish-thumb {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background-size: cover;
+  background-position: center;
+  background-color: #020617;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  flex-shrink: 0;
+}
+
+.wish-main {
+  min-width: 0;
+}
+
+.wish-text {
+  font-size: 13px;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-#profileImage {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  /* display: none; 기본은 숨김, 사진 있을 때만 보이게 */
+.wish-date {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 2px;
 }
 
-#profileInitials {
-  position: absolute;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+.wish-delete {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background: #ef4444;
+  color: #020617;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 24px;
-  background: #1f2937;
+  font-size: 14px;
+  cursor: pointer;
 }
 
-#profileEmail {
-  width: 100%;
-  position: absolute;
-  /* background-color: #ef4444; */
-  margin-top: 82px;
-  font-size: 11px;
-  opacity: 0.8;
-  text-align: center;
+/* ===== 소원 편지 패널 (트리 이미지 클릭) ===== */
+
+.wish-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  max-width: 380px;
+  width: calc(100% - 48px);
+  z-index: 18;
 }
 
-/* 로그인 안 되었을 때 */
-.profile-circle.logged-out #profileEmail {
-  margin-top: 0;
+.wish-panel-inner {
+  background: rgba(15, 23, 42, 0.98);
+  border-radius: 24px;
+  padding: 12px 14px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.85);
 }
 
-/* 2. 소원 추가 버튼 */
-.add-wish-circle {
-  background: #020617;
-}
-
-.add-wish-plus {
-  font-size: 32px;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.add-wish-label {
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-/* 3. 내 소원 리스트 (코인들) */
-#myWishList {
+.wish-panel-header {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-  /* background-color: #22c55e; */
-  width: 72px;
-  text-align: center;
-  
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
-/* 코인 하나 */
-.wish-coin {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: #020617;              /* 이미지 로딩 전 배경색 */
-  /* box-shadow: 0 8px 20px rgba(0,0,0,0.6); */
-  cursor: pointer;
+.wish-panel-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9ca3af;
 }
 
-/* 코인 안에 들어가는 이미지 */
-.wish-coin-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;                /* 꽉 채우기 */
+.wish-panel-sender {
+  font-size: 14px;
+  margin-top: 2px;
 }
 
-
-/* 빨간 삭제 점 */
-.wish-coin .delete-dot {
-  position: absolute;
-  right: -4px;
-  top: -4px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ef4444;
-  border: 2px solid #020617;
-  cursor: pointer;
+.wish-panel-body {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e5e7eb;
 }
 
-/* 모달 공통 */
-.modal.hidden {
-  display: none;
-}
+/* ===== 소원 추가 모달 ===== */
 
 .modal {
   position: fixed;
@@ -285,77 +375,96 @@ button.small {
   justify-content: center;
 }
 
+.modal.hidden {
+  display: none;
+}
+
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15,23,42,0.8);
+  background: rgba(15, 23, 42, 0.8);
   backdrop-filter: blur(10px);
 }
 
 .modal-content {
   position: relative;
-  width: 320px;
-  max-width: 90%;
-  padding: 20px 24px;
-  border-radius: 16px;
+  width: min(420px, calc(100% - 40px));
   background: #020617;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+  border-radius: 24px;
+  border: 1px solid rgba(30, 64, 175, 0.7);
+  padding: 18px 18px 16px;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.9);
   z-index: 1;
 }
 
-.modal-content h2 {
-  font-size: 18px;
-  margin-bottom: 8px;
-}
-
-.modal-desc {
-  font-size: 13px;
-  opacity: 0.8;
+.modal-title {
+  font-size: 16px;
   margin-bottom: 10px;
 }
 
-#wishText {
-  width: 100%;
-  background: #020617;
-  border-radius: 8px;
-  border: 1px solid #1f2937;
-  padding: 8px 10px;
-  color: #e5e7eb;
-  font-size: 13px;
-  resize: vertical;
+.form-group {
   margin-bottom: 10px;
+  font-size: 13px;
 }
 
-.file-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid #1f2937;
-  font-size: 12px;
-  cursor: pointer;
+.form-group label {
+  display: block;
   margin-bottom: 4px;
 }
 
-.file-label input {
-  display: none;
-}
-
-.file-name {
+.form-help {
   font-size: 11px;
-  opacity: 0.7;
-  margin-bottom: 10px;
+  color: #9ca3af;
+  margin-top: 2px;
 }
 
-.modal-buttons {
+input[type="text"],
+input[type="file"],
+textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 10px;
 }
 
-.modal-buttons button {
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 13px;
+/* ===== 반응형 살짝 ===== */
+
+@media (max-width: 640px) {
+  .top-bar {
+    top: 14px;
+    left: 14px;
+  }
+
+  .profile-circle,
+  .menu-circle {
+    width: 56px;
+    height: 56px;
+  }
+
+  .side-panel {
+    left: 14px;
+    right: 14px;
+    width: auto;
+  }
+
+  .wish-panel {
+    right: 14px;
+    left: 14px;
+    width: auto;
+  }
 }

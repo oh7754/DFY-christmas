@@ -4,117 +4,99 @@
   <meta charset="UTF-8" />
   <title>크리스마스 트리 갤러리</title>
   <link rel="stylesheet" href="style/style.css" />
-
 </head>
 <body>
-  <div id="ui">
-    <h1>🎄 크리스마스 트리 갤러리</h1>
-    <div style="font-size: 13px;">이미지를 올리면 트리에 걸려요.</div>
-
-    <!-- 로그인 상태 표시 -->
-    <div id="userInfo"
-        style="margin-top: 6px; font-size: 12px; opacity: .9;">
-      로그인 필요 (사내 구글 계정만 가능)
-    </div>
-
-    <!-- 로그인 / 로그아웃 버튼 -->
-    <div style="margin-top: 6px; display: flex; gap: 6px;">
-      <button id="loginBtn"
-              style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border:none; cursor:pointer; background:#22c55e; color:#022c22;">
-        Google 계정으로 로그인
-      </button>
-      <button id="logoutBtn"
-              style="font-size: 12px; padding: 4px 8px; border-radius: 6px; border:1px solid #1f2937; background:#0f172a; color:#e5e7eb; cursor:pointer; display:none;">
-        로그아웃
-      </button>
-    </div>
-
-    <!-- 소원 입력 -->
-    <div id="wishInputs" style="margin-top: 8px; font-size: 12px;">
-      <div style="opacity: 0.8; margin-bottom: 4px;">소원 적기 (선택)</div>
-      <input
-        id="wishName"
-        type="text"
-        placeholder="이름 또는 닉네임"
-        style="width: 100%; margin-bottom: 4px; padding: 4px 6px; border-radius: 6px; border: 1px solid #1f2937; background:#020617; color:#e5e7eb;"
-      />
-      <textarea
-        id="wishText"
-        rows="3"
-        placeholder="크리스마스 소원을 적어주세요 ✨"
-        style="width: 100%; padding: 4px 6px; border-radius: 6px; border: 1px solid #1f2937; background:#020617; color:#e5e7eb; resize: vertical;"
-      ></textarea>
-    </div>
-
-    <!-- 파일 업로드 (처음엔 막아둠) -->
-    <input id="fileInput" type="file" multiple accept="image/*" disabled />
-    <div id="count">걸린 사진: 0장</div>
-
-      <div id="myImages" style="margin-top:10px; font-size:12px;">
-        <div style="opacity:0.7;">내가 올린 사진</div>
-        <div id="myImagesList" style="margin-top:4px; max-height:120px; overflow:auto;">
-          <!-- 자바스크립트에서 채워 넣음 -->
-      </div>
-    </div>
-
-
-</div>
-    <!-- 오른쪽 사이드 레일 -->
-  <div id="sideRail">
-    <!-- 1. 로그인된 계정 프로필 -->
-    <div id="profileCircle" class="circle profile-circle">
-      <img id="profileImage" alt="" />
-      <span id="profileInitials"></span>
-    </div>
-    <span id="profileEmail"></span>
-
-
-    <!-- 2. 소원 추가 버튼 -->
-    <button id="addWishBtn" class="circle add-wish-circle">
-      <div class="add-wish-plus">+</div>
-      <div class="add-wish-label">소원 적기</div>
+  <!-- 상단 프로필 + 햄버거 버튼 -->
+  <div id="topBar" class="top-bar">
+    <button id="profileButton" class="profile-circle" aria-label="프로필">
+      <span id="profileInitial">?</span>
+      <img id="profileImage" class="profile-image hidden" alt="프로필 이미지" />
     </button>
+    <button id="menuToggle" class="menu-circle" aria-label="메뉴 열기">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
 
-    <!-- 3. 내가 올린 소원들 (이미지 리스트) -->
-    <div id="myWishList">
-      <!-- JS 에서 채워 넣음 -->
+  <!-- 햄버거 눌렀을 때 나오는 패널 -->
+  <div id="sidePanel" class="side-panel">
+    <div class="side-inner">
+      <!-- 로그인 / 계정 정보 -->
+      <div class="account-pill">
+        <div class="account-avatar">
+          <span id="accountInitial">?</span>
+          <img id="accountImage" class="profile-image hidden" alt="프로필 이미지" />
+        </div>
+        <div class="account-info">
+          <div id="accountEmail" class="account-email">로그인 필요</div>
+          <div id="accountSub" class="account-sub">사내 구글 계정만 사용 가능</div>
+          <div class="account-actions">
+            <button id="loginBtn" class="link-button">로그인</button>
+            <button id="logoutBtn" class="link-button hidden">로그아웃</button>
+          </div>
+        </div>
+        <button id="panelCloseBtn" class="pill-close" aria-label="메뉴 닫기">✕</button>
+      </div>
+
+      <!-- 내 소원 리스트 + 소원 추가 버튼 -->
+      <div class="panel-section">
+        <div class="panel-section-header">
+          <span class="panel-title">내가 올린 소원</span>
+          <button id="openWishModal" class="btn primary small">
+            + 소원 추가
+          </button>
+        </div>
+        <div id="myWishList" class="wish-list">
+          <!-- JS에서 채움 -->
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- 소원 작성 + 이미지 업로드 팝업 -->
+  <!-- 트리 이미지 클릭 시 띄우는 편지 패널 -->
+  <div id="wishPanel" class="wish-panel hidden">
+    <div class="wish-panel-inner">
+      <div class="wish-panel-header">
+        <div>
+          <div class="wish-panel-label">From</div>
+          <div id="wishSender" class="wish-panel-sender"></div>
+        </div>
+        <button id="wishCloseBtn" class="pill-close" aria-label="편지 닫기">✕</button>
+      </div>
+      <div class="wish-panel-body">
+        <p id="wishContent"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 소원 추가 모달 -->
   <div id="wishModal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
-      <h2>소원 적기</h2>
-      <p class="modal-desc">
-        소원을 적고 이미지를 함께 올려보세요.
-      </p>
-      <textarea id="wishText" rows="3"
-        placeholder="올해 이루어졌으면 하는 소원을 적어주세요."></textarea>
+      <h2 class="modal-title">소원 추가</h2>
 
-      <label class="file-label">
-        이미지 선택
-        <input id="wishImageInput" type="file" accept="image/*" />
-      </label>
-      <div id="wishImageName" class="file-name">선택된 파일 없음</div>
-
-      <div class="modal-buttons">
-        <button id="wishCancelBtn" class="secondary">닫기</button>
-        <button id="wishSubmitBtn">소원 올리기</button>
+      <div class="form-group">
+        <label for="wishFileInput">이미지 선택</label>
+        <input id="wishFileInput" type="file" accept="image/*" />
+        <div class="form-help">
+          큰 이미지는 자동으로 리사이즈되어 업로드돼요.
+        </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 소원 편지 패널 -->
-  <div id="wishPanel" class="wish-panel hidden">
-    <div class="wish-header">
-      <div class="wish-from">
-        From. <span id="wishSender"></span>
+      <div class="form-group">
+        <label for="wishNameInput">소원을 빌 사람 이름 (선택)</label>
+        <input id="wishNameInput" type="text" placeholder="예: 진환, 우리 팀 모두…" />
       </div>
-      <button id="wishCloseBtn" class="secondary small">닫기</button>
-    </div>
-    <div class="wish-body">
-      <p id="wishContent"></p>
+
+      <div class="form-group">
+        <label for="wishTextInput">소원 내용</label>
+        <textarea id="wishTextInput" rows="4"
+                  placeholder="올해 이루고 싶은 소원을 적어보세요."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button id="wishCancelBtn" class="btn secondary">취소</button>
+        <button id="wishSubmitBtn" class="btn primary">올리기</button>
+      </div>
     </div>
   </div>
 
