@@ -335,6 +335,71 @@ async function uploadAndRegister(file) {
   wishTextInput.value = "";
 }
 
+// ===== 이미지 리사이즈 & 압축 =====
+function compressImage(file) {
+  const MAX_WIDTH = 1920;   // 최대 가로
+  const MAX_HEIGHT = 1920;  // 최대 세로
+  const MAX_MB = 1.5;       // 이 크기보다 작으면 그냥 그대로 업로드
+
+  // 이미 충분히 작으면 그대로 사용
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB <= MAX_MB) {
+    return Promise.resolve(file);
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      // 비율 유지하면서 최대 크기 안으로 줄이기
+      const widthRatio = MAX_WIDTH / width;
+      const heightRatio = MAX_HEIGHT / height;
+      const ratio = Math.min(widthRatio, heightRatio, 1); // 1보다 크게는 안 키움
+
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // JPEG로 압축 (품질 0.8 정도)
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            return reject(new Error("이미지 압축 실패"));
+          }
+          const compressedFile = new File(
+            [blob],
+            file.name.replace(/\.\w+$/, ".jpg"), // 확장자를 jpg 로
+            { type: "image/jpeg" }
+          );
+          resolve(compressedFile);
+        },
+        "image/jpeg",
+        0.8
+      );
+    };
+
+    img.onerror = (err) => reject(err);
+    reader.onerror = (err) => reject(err);
+
+    reader.readAsDataURL(file);
+  });
+}
+
+
 // 업로드 인풋
 fileInput.addEventListener("change", (event) => {
   const files = event.target.files;
@@ -347,15 +412,23 @@ fileInput.addEventListener("change", (event) => {
     return;
   }
 
-  Array.from(files).forEach((file) => {
+  Array.from(files).forEach(async (file) => {
     if (!file.type.startsWith("image/")) return;
-    uploadAndRegister(file).catch((err) =>
-      console.error("업로드 실패", err)
-    );
+
+    try {
+      // 1) 먼저 리사이즈 & 압축
+      const processed = await compressImage(file);
+
+      // 2) 압축된 파일 업로드
+      await uploadAndRegister(processed);
+    } catch (err) {
+      console.error("이미지 처리/업로드 실패", err);
+    }
   });
 
   fileInput.value = "";
 });
+
 
 // ----- “내가 올린 사진” 리스트 + 삭제 -----
 function renderMyImages() {
