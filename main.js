@@ -1,3 +1,7 @@
+// ===== three.js & GLTFLoader (CDN ESM) =====
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js";
+
 // ===== Firebase CDN imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 import {
@@ -26,9 +30,6 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
-// ===== three.js & GLTFLoader (importmap에서 'three'를 매핑함) =====
-import * as THREE from "three";
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js";
 
 // === Firebase 설정 ===
 const firebaseConfig = {
@@ -121,7 +122,6 @@ function formatDate(ts) {
 /* ========= Auth 상태 ========= */
 
 onAuthStateChanged(auth, async (user) => {
-  // 회사 도메인 아닌 계정이면 로그아웃
   if (user && !isAllowedDomain(user.email)) {
     alert("사내 구글 계정만 사용할 수 있습니다.");
     await signOut(auth).catch(() => {});
@@ -225,7 +225,7 @@ wishModal.addEventListener("click", (e) => {
   }
 });
 
-/* ========= THREE.js 씬 ========= */
+/* ========= THREE.js 씬 (WebGLRenderer) ========= */
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020617);
@@ -236,11 +236,14 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.set(0, 6, 14);
+camera.position.set(0, 6, 18);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
 document.body.appendChild(renderer.domElement);
 
 const treeGroup = new THREE.Group();
@@ -272,8 +275,7 @@ const treeHeight = 8;
 const treeRadius = 4;
 const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-// 실제로 렌더링에는 GLB 모델 쓰지만,
-// 소원 위치 계산용 dummy 트리/별
+// dummy 트리 / 별
 const tree = new THREE.Object3D();
 tree.position.y = TREE_CENTER_Y;
 treeGroup.add(tree);
@@ -287,7 +289,7 @@ const loader = new GLTFLoader();
 let treeModel = null;
 
 loader.load(
-  "source/christmas-tree.glb", // index.html 기준 경로
+  "source/christmas-tree.glb",
   (gltf) => {
     treeModel = gltf.scene;
     treeModel.position.set(0, 0, 0);
@@ -299,6 +301,79 @@ loader.load(
     console.error("트리 모델 로드 실패:", error);
   }
 );
+
+// ====== 동그라미 라이트 세트업 ======
+const LIGHT_COUNT = 15;
+
+// 중앙에서 떨어지는 최소/최대 반지름
+const ORBIT_INNER_RADIUS = 0;   // 트리 근처
+const ORBIT_OUTER_RADIUS = 9;   // 너무 멀지는 않게
+
+// 동그라미(라이트 아이콘) 지오메트리 & 머티리얼
+const lightSphereGeo = new THREE.SphereGeometry(0.3, 24, 24); // ★ 크기 키움
+const lightSphereMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  vertexColors: true,            // 인스턴스 컬러 사용
+  transparent: true,
+  opacity: 1.0,
+  blending: THREE.AdditiveBlending, // 겹칠수록 밝게
+  depthWrite: false,
+  toneMapped: false,             // 톤매핑 영향 안 받게 (항상 쨍하게)
+});
+
+const lightHelpers = new THREE.InstancedMesh(
+  lightSphereGeo,
+  lightSphereMat,
+  LIGHT_COUNT
+);
+lightHelpers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(lightHelpers);
+
+const movingLights = [];
+const tmpColor = new THREE.Color();
+
+for (let i = 0; i < LIGHT_COUNT; i++) {
+  // HSL 예쁜 랜덤 색
+  const hue = Math.random();
+  tmpColor.setHSL(hue, 0.85, 0.6);
+
+  // 인스턴스 색
+  lightHelpers.setColorAt(i, tmpColor);
+
+  // 실제 포인트 라이트도 같은 색
+  const light = new THREE.PointLight(tmpColor.clone(), 3.0, 14);
+
+  // 궤도 파라미터
+  const radius = THREE.MathUtils.lerp(
+    ORBIT_INNER_RADIUS,
+    ORBIT_OUTER_RADIUS,
+    Math.random()
+  );
+  const angle = Math.random() * Math.PI * 2;
+  const height = 3.0 + Math.random() * 3.0;
+
+  light.userData.radius = radius;
+  light.userData.baseAngle = angle;
+  light.userData.height = height;
+  light.userData.speed = 0.4 + Math.random() * 0.4;
+  light.userData.offset = Math.random() * Math.PI * 2;
+
+  // 초기 위치
+  light.position.set(
+    Math.cos(angle) * radius,
+    height,
+    Math.sin(angle) * radius
+  );
+
+  scene.add(light);
+  movingLights.push(light);
+}
+
+// 인스턴스 컬러 버퍼 갱신
+if (lightHelpers.instanceColor) {
+  lightHelpers.instanceColor.needsUpdate = true;
+}
+
 
 // 눈 파티클
 const snowCount = 600;
@@ -464,7 +539,7 @@ async function uploadAndRegister(file) {
   });
 }
 
-// 모달의 "올리기"
+// 모달 "올리기"
 wishSubmitBtn.addEventListener("click", async () => {
   if (!currentUser) {
     alert("먼저 로그인 해주세요.");
@@ -692,9 +767,29 @@ function animate(time) {
   lastTime = time;
 
   if (!isDragging) treeGroup.rotation.y += delta * 0.2;
-
-  // star는 dummy지만 살짝 돌려서 느낌만
   star.rotation.y -= delta * 0.4;
+
+  // 포인트 라이트 궤도 애니메이션 + 헬퍼 위치 복사
+  const t = time * 0.001;
+  for (let i = 0; i < movingLights.length; i++) {
+    const light = movingLights[i];
+
+    const radius = light.userData.radius;
+    const baseAngle = light.userData.baseAngle;
+    const height = light.userData.height;
+    const speed = light.userData.speed;
+    const offset = light.userData.offset;
+
+    const angle = baseAngle + t * speed;
+
+    light.position.x = Math.cos(angle) * radius;
+    light.position.z = Math.sin(angle) * radius;
+    light.position.y = height + Math.sin(t * 0.9 + offset) * 0.4;
+
+    light.updateMatrixWorld();
+    lightHelpers.setMatrixAt(i, light.matrixWorld);
+  }
+  lightHelpers.instanceMatrix.needsUpdate = true;
 
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
@@ -712,7 +807,7 @@ function animate(time) {
 }
 animate(0);
 
-/* ========= scene export (원하면 사용) ========= */
+/* ========= scene export ========= */
 
 window.exportScene = function () {
   const json = scene.toJSON();
