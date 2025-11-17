@@ -135,8 +135,9 @@ canvas {
 }
 
 .top-sub {
+  margin-top:4px ;
   font-size: 12px;
-  opacity: 0.75;
+  opacity: 0.40;
 }
 
 /* ========================
@@ -201,32 +202,37 @@ canvas {
 
 .side-panel {
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 420px;
+  top: 100px;
+  right: 16px;
+  width: 392px;
   max-width: 100%;
-  height: 100%;
-  background: rgba(71, 76, 90, 0.1);
-  backdrop-filter: blur(42px);
+  background: #111827;
+  backdrop-filter: blur(200px);
   box-shadow: -0px 0 0px rgba(0, 0, 0, 0.8);
-  transform: translateX(100%);
+  transform: translateX(110%);
   transition: all 0.6s cubic-bezier(0.3, 0, 0, 1);
   z-index: 30;
   display: flex;
   flex-direction: column;
+  border-radius: 16px;
+  height: min-content;
+  overflow: hidden;
+  opacity: 0;
+  /* filter: blur(12px); */
 }
 
 .side-panel.open {
   transform: translateX(0);
   box-shadow: -20px 0 40px rgba(0, 0, 0, 0.8);
+  opacity: 1;
+  /* filter: blur(0px); */
 }
 
 .side-inner {
-  padding: 100px 24px 24px;
+  padding: 16px 16px 16px;
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 24px;
 }
 
 .panel-section-header {
@@ -237,7 +243,7 @@ canvas {
 }
 
 .panel-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -268,6 +274,7 @@ canvas {
 /* ===== 내 소원 리스트 ===== */
 
 .wish-list {
+  padding-top: 8px;
   flex: 1;
   overflow-y: auto;
   padding-right: 4px;
@@ -282,18 +289,18 @@ canvas {
 .wish-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 10px;
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.9);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
-  margin-bottom: 8px;
+  gap: 16px;
+  padding: 8px 8px;
+  border-radius: 8px;
+  background: rgba(31, 41, 66, 0.9);
+  /* box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55); */
+  margin-bottom: 12px;
 }
 
 .wish-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
   background: #111827;
   background-size: cover;
   background-position: center;
@@ -308,7 +315,7 @@ canvas {
 }
 
 .wish-text {
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -316,8 +323,8 @@ canvas {
 
 .wish-date {
   font-size: 11px;
-  opacity: 0.7;
-  margin-top: 2px;
+  opacity: 0.6;
+  margin-top: 6px;
 }
 
 .wish-delete {

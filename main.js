@@ -26,6 +26,10 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
+// === three.js 모듈 import ===
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js";
+
 // === Firebase 설정 ===
 const firebaseConfig = {
   apiKey: "AIzaSyB_bZoaw6cvdrot7DEabrXsfyDYM-ZgaR0",
@@ -83,7 +87,7 @@ let currentUser = null;
 let lastSnapshot = null;
 const shownImageIds = new Set();
 
-// 트리의 이미지 mesh → 데이터 매핑
+// 트리 위 이미지 mesh → 데이터 매핑
 const imageMeshes = [];
 const meshToData = new Map();
 
@@ -273,40 +277,43 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 scene.add(ground);
 
+// --------- 트리 영역 설정 (소원 위치 계산용) ---------
 const treeHeight = 8;
 const treeRadius = 3;
+const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.5, 16);
-const trunkMat = new THREE.MeshStandardMaterial({
-  color: 0x5b3a1e,
-  roughness: 0.9,
-});
-const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-trunk.position.y = 0.75;
-treeGroup.add(trunk);
-
-const treeGeo = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
-const treeMat = new THREE.MeshStandardMaterial({
-  color: 0x0f766e,
-  roughness: 0.6,
-  metalness: 0.2,
-});
-const tree = new THREE.Mesh(treeGeo, treeMat);
-tree.position.y = 0.75 + treeHeight / 2;
+// 실제 렌더링에 쓰이지 않는 더미 트리/별 오브젝트
+// (다른 코드에서 tree / star를 참조하므로 에러 방지용)
+const tree = new THREE.Object3D();
+tree.position.y = TREE_CENTER_Y;
 treeGroup.add(tree);
 
-const starGeo = new THREE.OctahedronGeometry(0.4);
-const starMat = new THREE.MeshStandardMaterial({
-  color: 0xfacc15,
-  emissive: 0xfacc15,
-  emissiveIntensity: 0.6,
-  metalness: 0.9,
-  roughness: 0.3,
-});
-const star = new THREE.Mesh(starGeo, starMat);
-star.position.y = tree.position.y + treeHeight / 2 + 0.8;
+const star = new THREE.Object3D();
+star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
 
+// --------- GLTF 트리 모델 로드 ---------
+const loader = new GLTFLoader();
+let treeModel = null;
+
+// ⚠️ 여기 경로를 실제 GLB 위치에 맞게 수정해줘
+// 예) /source/christmas-tree.glb
+loader.load(
+  "source/christmas-tree.glb",   // index.html 기준 경로
+  (gltf) => {
+    treeModel = gltf.scene;
+    treeModel.position.set(0, 0, 0);
+    treeModel.scale.set(1, 1, 1);
+    treeGroup.add(treeModel);
+  },
+  undefined,
+  (error) => {
+    console.error("트리 모델 로드 실패:", error);
+  }
+);
+
+
+// --------- 눈 ---------
 const snowCount = 600;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
@@ -742,3 +749,22 @@ function animate(time) {
   renderer.render(scene, camera);
 }
 animate(0);
+
+/* ========= scene export (옵션) ========= */
+// 콘솔에서 exportScene() 치면 JSON으로 내려받기
+window.exportScene = function () {
+  const json = scene.toJSON();
+  const str = JSON.stringify(json);
+  const blob = new Blob([str], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "dfy-christmas-scene.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  console.log("✅ scene JSON 내보내기 완료: dfy-christmas-scene.json");
+};
