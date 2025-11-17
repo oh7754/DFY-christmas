@@ -1,12 +1,15 @@
-/* ===== 리셋 & 기본 ===== */
+/* ========================
+   기본 레이아웃 / 배경
+   ======================== */
 * {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
 html,
 body {
-  margin: 0;
-  padding: 0;
+  width: 100%;
   height: 100%;
 }
 
@@ -15,26 +18,226 @@ body {
     sans-serif;
   background: #020617;
   color: #e5e7eb;
-  overflow: hidden;
+  overflow: hidden; /* three.js 캔버스가 전체 화면을 쓰게 */
 }
 
+/* three.js 캔버스는 JS에서 body에 바로 append 되므로
+   따로 스타일 줄 필요는 없지만 혹시 몰라서 */
 canvas {
   display: block;
 }
 
-/* 공통 버튼 */
+/* ========================
+   상단 프로필 + 햄버거
+   ======================== */
+
+.top-bar {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 20;
+}
+
+/* 프로필 캡슐 전체 */
+.top-account {
+  display: flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 999px;
+  padding: 6px 10px;
+  max-width: 320px;
+  height: 60px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+/* 접힌 상태: 동그라미만 보이도록 */
+.top-account.collapsed {
+  width: 60px;
+  padding-right: 10px;
+}
+
+/* 펼쳐진 상태: 메일 텍스트 노출 */
+.top-account.expanded {
+  width: 320px;
+}
+
+/* 아바타 동그라미 */
+.top-account-avatar {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #1f2937;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.top-account-avatar span {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.profile-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-image.hidden {
+  display: none;
+}
+
+/* 프로필 텍스트 영역 */
+.top-account-text {
+  margin-left: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* 접힌 상태에서는 텍스트 보이지 않게 */
+.top-account.collapsed .top-account-text {
+  opacity: 0;
+}
+
+/* 펼쳐진 상태에서만 자연스럽게 보이도록 */
+.top-account.expanded .top-account-text {
+  opacity: 1;
+}
+
+.top-email {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-sub {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* ========================
+   햄버거 / X 버튼
+   ======================== */
+
+.menu-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid #fbbf24;
+  background: radial-gradient(circle at 30% 30%, #111827 0, #020617 60%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+}
+
+.menu-circle .menu-icon {
+  width: 22px;
+  height: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.menu-circle .menu-icon span {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+/* X 텍스트는 기본적으로 숨겨두고, open 상태에서만 표시 */
+.menu-circle .menu-close {
+  position: absolute;
+  font-size: 20px;
+  color: #e5e7eb;
+  display: none;
+}
+
+.menu-circle.open .menu-icon {
+  display: none;
+}
+
+.menu-circle.open .menu-close {
+  display: block;
+}
+
+/* ========================
+   사이드 패널 (내 소원 리스트)
+   ======================== */
+
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 360px;
+  max-width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(18px);
+  box-shadow: -20px 0 40px rgba(0, 0, 0, 0.8);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-panel.open {
+  transform: translateX(0);
+}
+
+.side-inner {
+  padding: 80px 24px 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ===== 버튼 공통 ===== */
 .btn {
   border: none;
   border-radius: 999px;
   padding: 6px 14px;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  white-space: nowrap;
 }
 
 .btn.primary {
@@ -42,213 +245,257 @@ canvas {
   color: #022c22;
 }
 
-.btn.primary:hover {
-  background: #16a34a;
-  transform: translateY(-1px);
-}
-
 .btn.secondary {
-  background: #0b1120;
-  border: 1px solid #1f2937;
-  color: #e5e7eb;
-}
-
-.btn.secondary:hover {
-  background: #020617;
-}
-
-.btn.small {
-  padding: 4px 12px;
-  font-size: 12px;
-}
-
-.link-button {
-  border: none;
   background: transparent;
-  padding: 0;
-  margin: 0;
-  font-size: 12px;
-  color: #9ca3af;
-  cursor: pointer;
-}
-
-.link-button:hover {
+  border: 1px solid #4b5563;
   color: #e5e7eb;
 }
 
-.hidden {
-  display: none !important;
+/* ===== 내 소원 리스트 ===== */
+
+.wish-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
-/* ===== 상단 프로필 + 햄버거 ===== */
+.wish-list-empty {
+  font-size: 13px;
+  opacity: 0.7;
+  padding: 4px 0;
+}
 
-.top-bar {
-  position: fixed;
-  top: 20px;
-  left: 24px;
-  z-index: 20;
+.wish-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+  margin-bottom: 8px;
 }
 
-/* 프로필 필: collapsed 상태에선 동그라미만, expanded 에선 옆으로 길어짐 */
-.top-account {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: radial-gradient(circle at 30% 30%, #111827, #020617);
-  border-radius: 999px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  padding: 6px 12px 6px 6px;
-  overflow: hidden;
-  max-width: 420px;
-  transition: max-width 0.2s ease, padding-right 0.2s ease;
-}
-
-.top-account.collapsed {
-  max-width: 64px;   /* 프로필 동그라미 너비 */
-  padding-right: 6px;
-}
-
-.top-account.expanded {
-  max-width: 420px;
-  padding-right: 14px;
-}
-
-.top-account-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #1d4ed8, #020617);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #e5e7eb;
-  font-weight: 600;
-  font-size: 20px;
-  position: relative;
+.wish-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #111827;
+  background-size: cover;
+  background-position: center;
   flex-shrink: 0;
 }
 
-.profile-image {
-  position: absolute;
-  inset: 4px;
-  width: auto;
-  height: auto;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.top-account-text {
-  margin-left: 10px;
+.wish-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+}
+
+.wish-text {
+  font-size: 13px;
   white-space: nowrap;
-  opacity: 0;
-  transform: translateY(2px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.top-account.expanded .top-account-text {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.top-email {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.top-sub {
-  font-size: 12px;
-  color: #9ca3af;
+.wish-date {
+  font-size: 11px;
+  opacity: 0.7;
   margin-top: 2px;
 }
 
-/* 햄버거 / X 버튼 */
-.menu-circle {
-  width: 64px;
-  height: 64px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #111827, #020617);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.wish-delete {
+  border: none;
+  background: transparent;
+  color: #f97373;
+  font-size: 16px;
+  padding: 4px;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
 }
 
-.menu-icon,
-.menu-close {
-  position: absolute;
+/* ========================
+   트리 이미지 클릭 → 편지 패널
+   ======================== */
+
+.wish-panel {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+}
+
+.wish-panel.hidden {
+  display: none;
+}
+
+.wish-panel-inner {
+  width: min(420px, 90vw);
+  background: rgba(15, 23, 42, 0.98);
+  border-radius: 24px;
+  padding: 16px 18px 18px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.wish-panel-header {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.wish-panel-label {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.wish-panel-sender {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pill-close {
+  border-radius: 999px;
+  border: none;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.wish-panel-body {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* ========================
+   소원 추가 모달
+   ======================== */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 40; /* 탑바/패널 위로 */
 }
 
-.menu-icon span {
-  display: block;
-  width: 22px;
-  height: 2px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  margin: 2px 0;
+.modal.hidden {
+  display: none;
 }
 
-.menu-close {
-  font-size: 18px;
-  color: #e5e7eb;
-  opacity: 0;
-  transform: scale(0.6);
-}
-
-.menu-circle.open .menu-icon {
-  opacity: 0;
-  transform: scale(0.5);
-}
-
-.menu-circle.open .menu-close {
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* ===== 사이드 패널 (내 소원 리스트) ===== */
-
-.side-panel {
-  position: fixed;
-  top: 96px;
-  left: 24px;
-  max-width: 680px;
-  width: calc(100% - 48px);
-  background: rgba(15, 23, 42, 0.96);
-  border-radius: 32px;
-  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(16px);
-  padding: 18px 20px 16px;
-  z-index: 19;
-
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-8px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.side-panel.open {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.side-inner {
+.modal:not(.hidden) {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
-/* 이하: panel-section, wish-list, wish-row, 모달, 편지 패널, 반응형 등은
-   이전에 내가 준 버전 그대로 사용하면 된다. (변경 없음) */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+}
+
+.modal-content {
+  position: relative;
+  width: min(480px, 94vw);
+  background: #020617;
+  border-radius: 24px;
+  padding: 20px 22px 18px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  z-index: 1;
+  color: #f9fafb;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+/* ===== 폼 ===== */
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.form-help {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+input[type="file"],
+input[type="text"],
+textarea {
+  width: 100%;
+  background: #020617;
+  border-radius: 10px;
+  border: 1px solid #4b5563;
+  padding: 6px 8px;
+  color: #f9fafb;
+  font-size: 13px;
+}
+
+input[type="file"] {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+}
+
+.modal-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ========================
+   반응형 조금만
+   ======================== */
+
+@media (max-width: 640px) {
+  .top-bar {
+    top: 10px;
+    left: 10px;
+  }
+
+  .top-account {
+    height: 52px;
+  }
+
+  .menu-circle {
+    width: 52px;
+    height: 52px;
+  }
+
+  .side-inner {
+    padding-top: 72px;
+  }
+
+  .wish-panel-inner {
+    border-radius: 18px;
+  }
+}
