@@ -51,9 +51,12 @@ const ALLOWED_DOMAIN = "dfy.co.kr";
 /* ========= DOM 요소 ========= */
 
 // 상단 UI
-const profileButton = document.getElementById("profileButton");
-const profileInitial = document.getElementById("profileInitial");
-const profileImage = document.getElementById("profileImage");
+const topAccount = document.getElementById("topAccount");
+const topInitial = document.getElementById("topInitial");
+const topImage = document.getElementById("topImage");
+const topEmail = document.getElementById("topEmail");
+const topSub = document.getElementById("topSub");
+
 const menuToggle = document.getElementById("menuToggle");
 
 // 사이드 패널
@@ -125,7 +128,6 @@ function formatDate(ts) {
 
 onAuthStateChanged(auth, (user) => {
   if (user && !isAllowedDomain(user.email)) {
-    // 다른 도메인이면 바로 로그아웃
     alert("사내 구글 계정만 사용할 수 있습니다.");
     signOut(auth).catch(() => {});
     return;
@@ -136,38 +138,31 @@ onAuthStateChanged(auth, (user) => {
   if (currentUser) {
     const init = makeInitialFromUser(currentUser);
 
-    // 상단 프로필
-    profileInitial.textContent = init;
-    accountInitial.textContent = init;
-
+    // 상단 프로필 이니셜 / 사진
+    topInitial.textContent = init;
     if (currentUser.photoURL) {
-      profileImage.src = currentUser.photoURL;
-      profileImage.classList.remove("hidden");
-      accountImage.src = currentUser.photoURL;
-      accountImage.classList.remove("hidden");
+      topImage.src = currentUser.photoURL;
+      topImage.classList.remove("hidden");
     } else {
-      profileImage.classList.add("hidden");
-      accountImage.classList.add("hidden");
+      topImage.classList.add("hidden");
     }
 
-    accountEmail.textContent = currentUser.email || "알 수 없는 계정";
-    accountSub.textContent = "로그인 완료";
+    topEmail.textContent = currentUser.email || "알 수 없는 계정";
+    topSub.textContent = "로그인 완료";
     loginBtn.classList.add("hidden");
     logoutBtn.classList.remove("hidden");
   } else {
-    profileInitial.textContent = "?";
-    profileImage.classList.add("hidden");
-    accountInitial.textContent = "?";
-    accountImage.classList.add("hidden");
-
-    accountEmail.textContent = "로그인 필요";
-    accountSub.textContent = "사내 구글 계정만 사용 가능";
+    topInitial.textContent = "?";
+    topImage.classList.add("hidden");
+    topEmail.textContent = "로그인 필요";
+    topSub.textContent = "사내 구글 계정만 사용 가능";
     loginBtn.classList.remove("hidden");
     logoutBtn.classList.add("hidden");
   }
 
   renderMyWishes();
 });
+
 
 // 로그인 / 로그아웃 버튼
 loginBtn.addEventListener("click", async () => {
@@ -190,21 +185,47 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 /* ========= 사이드 패널 토글 ========= */
-
+// =====================
+//  패널 열기 / 닫기 함수
+// =====================
 function openPanel() {
   sidePanel.classList.add("open");
+  topAccount.classList.remove("collapsed");
+  topAccount.classList.add("expanded");
+  menuToggle.classList.add("open");
 }
 
 function closePanel() {
   sidePanel.classList.remove("open");
+  topAccount.classList.add("collapsed");
+  topAccount.classList.remove("expanded");
+  menuToggle.classList.remove("open");
 }
 
+// =====================
+//  버튼 이벤트 등록
+// =====================
 menuToggle.addEventListener("click", () => {
-  if (sidePanel.classList.contains("open")) closePanel();
-  else openPanel();
+  if (sidePanel.classList.contains("open")) {
+    closePanel();
+  } else {
+    openPanel();
+  }
 });
 
-panelCloseBtn.addEventListener("click", closePanel);
+// 프로필 필 전체를 눌러도 열리게 하고 싶으면:
+topAccount.addEventListener("click", () => {
+  if (!sidePanel.classList.contains("open")) {
+    openPanel();
+  }
+});
+
+// 패널 안의 X 버튼으로 닫기
+if (panelCloseBtn) {
+  panelCloseBtn.addEventListener("click", closePanel);
+}
+
+
 
 /* ========= 소원 추가 모달 토글 ========= */
 

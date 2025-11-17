@@ -8,36 +8,30 @@
 <body>
   <!-- 상단 프로필 + 햄버거 버튼 -->
   <div id="topBar" class="top-bar">
-    <button id="profileButton" class="profile-circle" aria-label="프로필">
-      <span id="profileInitial">?</span>
-      <img id="profileImage" class="profile-image hidden" alt="프로필 이미지" />
-    </button>
+    <!-- 프로필 필(닫힌 상태에선 동그라미만, 열린 상태에선 옆으로 길어지면서 메일 노출) -->
+    <div id="topAccount" class="top-account collapsed">
+      <div class="top-account-avatar">
+        <span id="topInitial">?</span>
+        <img id="topImage" class="profile-image hidden" alt="프로필 이미지" />
+      </div>
+      <div class="top-account-text">
+        <div id="topEmail" class="top-email">로그인 필요</div>
+        <div id="topSub" class="top-sub">사내 구글 계정만 사용 가능</div>
+      </div>
+    </div>
+
+    <!-- 햄버거 → 열린 상태에서는 X 버튼으로 -->
     <button id="menuToggle" class="menu-circle" aria-label="메뉴 열기">
-      <span></span><span></span><span></span>
+      <div class="menu-icon">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="menu-close">✕</div>
     </button>
   </div>
 
-  <!-- 햄버거 눌렀을 때 나오는 패널 -->
+  <!-- 햄버거 눌렀을 때 나오는 패널 (내 소원 리스트) -->
   <div id="sidePanel" class="side-panel">
     <div class="side-inner">
-      <!-- 로그인 / 계정 정보 -->
-      <div class="account-pill">
-        <div class="account-avatar">
-          <span id="accountInitial">?</span>
-          <img id="accountImage" class="profile-image hidden" alt="프로필 이미지" />
-        </div>
-        <div class="account-info">
-          <div id="accountEmail" class="account-email">로그인 필요</div>
-          <div id="accountSub" class="account-sub">사내 구글 계정만 사용 가능</div>
-          <div class="account-actions">
-            <button id="loginBtn" class="link-button">로그인</button>
-            <button id="logoutBtn" class="link-button hidden">로그아웃</button>
-          </div>
-        </div>
-        <button id="panelCloseBtn" class="pill-close" aria-label="메뉴 닫기">✕</button>
-      </div>
-
-      <!-- 내 소원 리스트 + 소원 추가 버튼 -->
       <div class="panel-section">
         <div class="panel-section-header">
           <span class="panel-title">내가 올린 소원</span>
@@ -100,7 +94,7 @@
     </div>
   </div>
 
-  <!-- three.js (r150.1, 예전 방식 지원) -->
+  <!-- three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <!-- 앱 코드 -->
   <script type="module" src="main.js"></script>
