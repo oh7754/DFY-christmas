@@ -117,8 +117,6 @@ function formatDate(ts) {
   }).format(d);
 }
 
-/* ========= Auth 상태 관리 ========= */
-
 onAuthStateChanged(auth, (user) => {
   if (user && !isAllowedDomain(user.email)) {
     alert("사내 구글 계정만 사용할 수 있습니다.");
@@ -142,15 +140,11 @@ onAuthStateChanged(auth, (user) => {
 
     topEmail.textContent = currentUser.email || "알 수 없는 계정";
     topSub.textContent = "로그인 완료";
-    loginBtn.classList.add("hidden");
-    logoutBtn.classList.remove("hidden");
   } else {
     topInitial.textContent = "?";
     topImage.classList.add("hidden");
     topEmail.textContent = "로그인 필요";
     topSub.textContent = "사내 구글 계정만 사용 가능";
-    loginBtn.classList.remove("hidden");
-    logoutBtn.classList.add("hidden");
   }
 
   renderMyWishes();
@@ -211,60 +205,6 @@ if (topAccount) {
   // 초기 상태: 접힌 상태
   topAccount.classList.add("collapsed");
 }
-
-
-/* ========= 사이드 패널 토글 ========= */
-// =====================
-//  패널 열기 / 닫기 함수
-// =====================
-function openPanel() {
-  if (!sidePanel || !topAccount || !menuToggle) return;
-  sidePanel.classList.add("open");
-  topAccount.classList.remove("collapsed");
-  topAccount.classList.add("expanded");
-  menuToggle.classList.add("open");
-}
-
-function closePanel() {
-  if (!sidePanel || !topAccount || !menuToggle) return;
-  sidePanel.classList.remove("open");
-  topAccount.classList.add("collapsed");
-  topAccount.classList.remove("expanded");
-  menuToggle.classList.remove("open");
-}
-
-
-// =====================
-//  버튼 이벤트 등록
-// =====================
-
-if (menuToggle) {
-  menuToggle.addEventListener("click", () => {
-    if (sidePanel && sidePanel.classList.contains("open")) {
-      closePanel();
-    } else {
-      openPanel();
-    }
-  });
-}
-
-// 프로필 필 전체를 눌러도 열리게
-if (topAccount) {
-  topAccount.addEventListener("click", () => {
-    if (!sidePanel || sidePanel.classList.contains("open")) return;
-    openPanel();
-  });
-
-  // 초기 상태: 접힌 상태
-  topAccount.classList.add("collapsed");
-}
-
-// 패널 안의 X 버튼으로 닫기
-if (panelCloseBtn) {
-  panelCloseBtn.addEventListener("click", closePanel);
-}
-
-
 
 /* ========= 소원 추가 모달 토글 ========= */
 
