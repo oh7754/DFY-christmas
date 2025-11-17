@@ -1,4 +1,3 @@
-console.log("🔥 main.js loaded - version");
 // ===== three.js & GLTFLoader (CDN ESM) =====
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js";
@@ -31,6 +30,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
+console.log("🚀 dfy main.js loaded");
 
 // === Firebase 설정 ===
 const firebaseConfig = {
