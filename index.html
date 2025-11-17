@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <title>크리스마스 트리 갤러리</title>
   <link rel="stylesheet" href="style/style.css" />
+
+  <!-- three.js를 'three'라는 이름으로 인식시키는 import map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"
+    }
+  }
+  </script>
 </head>
 <body>
   <!-- 상단 프로필 + 햄버거 버튼 -->
@@ -27,20 +36,20 @@
     </button>
   </div>
 
+  <!-- 햄버거 패널 -->
   <div id="sidePanel" class="side-panel">
     <div class="side-inner">
       <div class="panel-section">
         <div class="panel-section-header">
           <span class="panel-title">내가 올린 소원</span>
-          <button id="openWishModal" class="btn primary small">
-            + 소원 추가
-          </button>
+          <button id="openWishModal" class="btn primary small">+ 소원 추가</button>
         </div>
         <div id="myWishList" class="wish-list"></div>
       </div>
     </div>
   </div>
 
+  <!-- 편지 패널 -->
   <div id="wishPanel" class="wish-panel hidden">
     <div class="wish-panel-inner">
       <div class="wish-panel-header">
@@ -56,6 +65,7 @@
     </div>
   </div>
 
+  <!-- 소원 추가 모달 -->
   <div id="wishModal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
@@ -64,9 +74,7 @@
       <div class="form-group">
         <label for="wishFileInput">이미지 선택</label>
         <input id="wishFileInput" type="file" accept="image/*" />
-        <div class="form-help">
-          큰 이미지는 자동으로 리사이즈되어 업로드돼요.
-        </div>
+        <div class="form-help">큰 이미지는 자동으로 리사이즈되어 업로드돼요.</div>
       </div>
 
       <div class="form-group">
@@ -77,7 +85,7 @@
       <div class="form-group">
         <label for="wishTextInput">소원 내용</label>
         <textarea id="wishTextInput" rows="4"
-                  placeholder="올해 이루고 싶은 소원을 적어보세요."></textarea>
+          placeholder="올해 이루고 싶은 소원을 적어보세요."></textarea>
       </div>
 
       <div class="modal-actions">
@@ -87,7 +95,7 @@
     </div>
   </div>
 
-  <!-- ⚠️ 이 한 줄만! -->
+  <!-- 우리 앱 -->
   <script type="module" src="main.js"></script>
 </body>
 </html>

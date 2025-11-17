@@ -1,4 +1,4 @@
-// ===== Firebase CDN import =====
+// ===== Firebase CDN imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 import {
   getFirestore,
@@ -26,8 +26,8 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
-// === three.js 모듈 import ===
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
+// ===== three.js & GLTFLoader (importmap에서 'three'를 매핑함) =====
+import * as THREE from "three";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js";
 
 // === Firebase 설정 ===
@@ -62,12 +62,10 @@ const topEmail = document.getElementById("topEmail");
 const topSub = document.getElementById("topSub");
 const menuToggle = document.getElementById("menuToggle");
 
-// 사이드 패널
+// 사이드 패널 & 모달
 const sidePanel = document.getElementById("sidePanel");
 const myWishList = document.getElementById("myWishList");
 const openWishModalBtn = document.getElementById("openWishModal");
-
-// 소원 추가 모달
 const wishModal = document.getElementById("wishModal");
 const wishFileInput = document.getElementById("wishFileInput");
 const wishNameInput = document.getElementById("wishNameInput");
@@ -75,7 +73,7 @@ const wishTextInput = document.getElementById("wishTextInput");
 const wishCancelBtn = document.getElementById("wishCancelBtn");
 const wishSubmitBtn = document.getElementById("wishSubmitBtn");
 
-// 편지 패널 (트리 이미지 클릭 시)
+// 편지 패널
 const wishPanel = document.getElementById("wishPanel");
 const wishSenderEl = document.getElementById("wishSender");
 const wishContentEl = document.getElementById("wishContent");
@@ -87,7 +85,7 @@ let currentUser = null;
 let lastSnapshot = null;
 const shownImageIds = new Set();
 
-// 트리 위 이미지 mesh → 데이터 매핑
+// 트리 이미지 mesh → 데이터 매핑
 const imageMeshes = [];
 const meshToData = new Map();
 
@@ -120,10 +118,10 @@ function formatDate(ts) {
   }).format(d);
 }
 
-/* ========= Auth 상태 관리 ========= */
+/* ========= Auth 상태 ========= */
 
 onAuthStateChanged(auth, async (user) => {
-  // 회사 도메인 아닌 계정이면 바로 로그아웃
+  // 회사 도메인 아닌 계정이면 로그아웃
   if (user && !isAllowedDomain(user.email)) {
     alert("사내 구글 계정만 사용할 수 있습니다.");
     await signOut(auth).catch(() => {});
@@ -134,8 +132,8 @@ onAuthStateChanged(auth, async (user) => {
 
   if (currentUser) {
     const init = makeInitialFromUser(currentUser);
-
     topInitial.textContent = init;
+
     if (currentUser.photoURL) {
       topImage.src = currentUser.photoURL;
       topImage.classList.remove("hidden");
@@ -155,7 +153,7 @@ onAuthStateChanged(auth, async (user) => {
   renderMyWishes();
 });
 
-/* ========= 프로필 캡슐 & 메뉴 버튼 ========= */
+/* ========= 상단 프로필 & 패널 ========= */
 
 function openPanel() {
   if (!sidePanel || !topAccount || !menuToggle) return;
@@ -173,7 +171,6 @@ function closePanel() {
   menuToggle.classList.remove("open");
 }
 
-// 햄버거 / X 버튼
 if (menuToggle) {
   menuToggle.addEventListener("click", () => {
     if (!sidePanel) return;
@@ -185,9 +182,6 @@ if (menuToggle) {
   });
 }
 
-// 프로필 캡슐 클릭
-// - 로그인 안 되어 있으면: 로그인 팝업
-// - 로그인 되어 있으면: 패널 열기
 if (topAccount) {
   topAccount.addEventListener("click", async () => {
     if (!currentUser) {
@@ -199,14 +193,10 @@ if (topAccount) {
       }
       return;
     }
-
-    if (!sidePanel) return;
     if (!sidePanel.classList.contains("open")) {
       openPanel();
     }
   });
-
-  // 초기 상태: 접힘
   topAccount.classList.add("collapsed");
 }
 
@@ -223,14 +213,12 @@ function openWishModal() {
 function closeWishModal() {
   wishModal.classList.add("hidden");
   wishFileInput.value = "";
-  // 이름은 유지, 소원 텍스트만 초기화
   wishTextInput.value = "";
 }
 
 openWishModalBtn.addEventListener("click", openWishModal);
 wishCancelBtn.addEventListener("click", closeWishModal);
 
-// 모달 바깥 영역 클릭 시 닫기
 wishModal.addEventListener("click", (e) => {
   if (e.target === wishModal || e.target.classList.contains("modal-backdrop")) {
     closeWishModal();
@@ -258,14 +246,7 @@ document.body.appendChild(renderer.domElement);
 const treeGroup = new THREE.Group();
 scene.add(treeGroup);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
-hemiLight.position.set(0, 1, 0);
-scene.add(hemiLight);
-
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-dirLight.position.set(5, 10, 5);
-scene.add(dirLight);
-
+// 바닥
 const groundGeo = new THREE.CircleGeometry(18, 64);
 const groundMat = new THREE.MeshStandardMaterial({
   color: 0x0b1220,
@@ -277,13 +258,22 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 scene.add(ground);
 
-// --------- 트리 영역 설정 (소원 위치 계산용) ---------
+// 조명
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
+hemiLight.position.set(0, 1, 0);
+scene.add(hemiLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(5, 10, 5);
+scene.add(dirLight);
+
+// 트리 치수(소원 위치 계산용)
 const treeHeight = 8;
-const treeRadius = 3;
+const treeRadius = 4;
 const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-// 실제 렌더링에 쓰이지 않는 더미 트리/별 오브젝트
-// (다른 코드에서 tree / star를 참조하므로 에러 방지용)
+// 실제로 렌더링에는 GLB 모델 쓰지만,
+// 소원 위치 계산용 dummy 트리/별
 const tree = new THREE.Object3D();
 tree.position.y = TREE_CENTER_Y;
 treeGroup.add(tree);
@@ -292,18 +282,16 @@ const star = new THREE.Object3D();
 star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
 
-// --------- GLTF 트리 모델 로드 ---------
+// GLB 트리 로드
 const loader = new GLTFLoader();
 let treeModel = null;
 
-// ⚠️ 여기 경로를 실제 GLB 위치에 맞게 수정해줘
-// 예) /source/christmas-tree.glb
 loader.load(
-  "source/christmas-tree.glb",   // index.html 기준 경로
+  "source/christmas-tree.glb", // index.html 기준 경로
   (gltf) => {
     treeModel = gltf.scene;
     treeModel.position.set(0, 0, 0);
-    treeModel.scale.set(1, 1, 1);
+    treeModel.scale.set(0.7, 0.7, 0.7);
     treeGroup.add(treeModel);
   },
   undefined,
@@ -312,8 +300,7 @@ loader.load(
   }
 );
 
-
-// --------- 눈 ---------
+// 눈 파티클
 const snowCount = 600;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
@@ -323,10 +310,7 @@ for (let i = 0; i < snowCount; i++) {
   snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
 }
 snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
-const snowMat = new THREE.PointsMaterial({
-  color: 0xffffff,
-  size: 0.06,
-});
+const snowMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.06 });
 const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
@@ -373,15 +357,10 @@ function addImageToTree(docId, data) {
       treeGroup.add(plane);
 
       imageMeshes.push(plane);
-      meshToData.set(plane, {
-        ...data,
-        id: docId,
-      });
+      meshToData.set(plane, { ...data, id: docId });
     },
     undefined,
-    (err) => {
-      console.error("텍스처 로드 오류", err);
-    }
+    (err) => console.error("텍스처 로드 오류", err)
   );
 }
 
@@ -397,9 +376,7 @@ onSnapshot(q, (snapshot) => {
     shownImageIds.add(id);
 
     const data = docSnap.data();
-    if (data.url) {
-      addImageToTree(id, data);
-    }
+    if (data.url) addImageToTree(id, data);
   });
 
   renderMyWishes();
@@ -413,17 +390,15 @@ function compressImage(file) {
   const MAX_MB = 1.5;
 
   const sizeMB = file.size / (1024 * 1024);
-  if (sizeMB <= MAX_MB) {
-    return Promise.resolve(file);
-  }
+  if (sizeMB <= MAX_MB) return Promise.resolve(file);
 
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
 
-    reader.onload = (e) => {
-      img.src = e.target.result;
-    };
+    reader.onload = (e) => (img.src = e.target.result);
+    reader.onerror = reject;
+    img.onerror = reject;
 
     img.onload = () => {
       let width = img.width;
@@ -444,10 +419,7 @@ function compressImage(file) {
 
       canvas.toBlob(
         (blob) => {
-          if (!blob) {
-            reject(new Error("이미지 압축 실패"));
-            return;
-          }
+          if (!blob) return reject(new Error("이미지 압축 실패"));
           const compressedFile = new File(
             [blob],
             file.name.replace(/\.\w+$/, ".jpg"),
@@ -459,9 +431,6 @@ function compressImage(file) {
         0.8
       );
     };
-
-    img.onerror = (err) => reject(err);
-    reader.onerror = (err) => reject(err);
 
     reader.readAsDataURL(file);
   });
@@ -475,9 +444,7 @@ async function uploadAndRegister(file) {
 
   const processedFile = await compressImage(file);
 
-  const filePath = `uploads/${currentUser.uid}/${Date.now()}_${
-    processedFile.name
-  }`;
+  const filePath = `uploads/${currentUser.uid}/${Date.now()}_${processedFile.name}`;
   const storageRef = ref(storage, filePath);
   const snapshot = await uploadBytes(storageRef, processedFile);
   const downloadURL = await getDownloadURL(snapshot.ref);
@@ -497,19 +464,17 @@ async function uploadAndRegister(file) {
   });
 }
 
-// 모달의 "올리기" 버튼
+// 모달의 "올리기"
 wishSubmitBtn.addEventListener("click", async () => {
   if (!currentUser) {
     alert("먼저 로그인 해주세요.");
     return;
   }
-
   const file = wishFileInput.files[0];
   if (!file) {
     alert("이미지를 선택해 주세요.");
     return;
   }
-
   try {
     await uploadAndRegister(file);
     closeWishModal();
@@ -523,7 +488,6 @@ wishSubmitBtn.addEventListener("click", async () => {
 
 function renderMyWishes() {
   if (!myWishList) return;
-
   myWishList.innerHTML = "";
 
   if (!currentUser) {
@@ -559,9 +523,7 @@ function renderMyWishes() {
 
       const thumb = document.createElement("div");
       thumb.className = "wish-thumb";
-      if (data.url) {
-        thumb.style.backgroundImage = `url(${data.url})`;
-      }
+      if (data.url) thumb.style.backgroundImage = `url(${data.url})`;
 
       const main = document.createElement("div");
       main.className = "wish-main";
@@ -616,7 +578,7 @@ async function handleDeleteImage(docId, data) {
   }
 }
 
-/* ========= 트리 이미지 클릭 → 편지 띄우기 ========= */
+/* ========= 트리 이미지 클릭 → 편지 ========= */
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -729,9 +691,9 @@ function animate(time) {
   const delta = (time - lastTime) / 1000;
   lastTime = time;
 
-  if (!isDragging) {
-    treeGroup.rotation.y += delta * 0.2;
-  }
+  if (!isDragging) treeGroup.rotation.y += delta * 0.2;
+
+  // star는 dummy지만 살짝 돌려서 느낌만
   star.rotation.y -= delta * 0.4;
 
   const pos = snowGeo.attributes.position;
@@ -750,8 +712,8 @@ function animate(time) {
 }
 animate(0);
 
-/* ========= scene export (옵션) ========= */
-// 콘솔에서 exportScene() 치면 JSON으로 내려받기
+/* ========= scene export (원하면 사용) ========= */
+
 window.exportScene = function () {
   const json = scene.toJSON();
   const str = JSON.stringify(json);
