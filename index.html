@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <title>크리스마스 트리 갤러리</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style/style.css" />
 </head>
 <body>
   <!-- 상단 프로필 + 햄버거 버튼 -->
   <div id="topBar" class="top-bar">
-    <!-- 프로필 필(닫힌 상태에선 동그라미만, 열린 상태에선 옆으로 길어지면서 메일 노출) -->
+    <!-- 프로필 캡슐 (닫힘: 동그라미만, 열림: 옆으로 길어지며 메일 노출) -->
     <div id="topAccount" class="top-account collapsed">
       <div class="top-account-avatar">
         <span id="topInitial">?</span>
@@ -20,10 +21,12 @@
       </div>
     </div>
 
-    <!-- 햄버거 → 열린 상태에서는 X 버튼으로 -->
+    <!-- 햄버거 → open 상태에서는 X 아이콘 -->
     <button id="menuToggle" class="menu-circle" aria-label="메뉴 열기">
       <div class="menu-icon">
-        <span></span><span></span><span></span>
+        <span></span>
+        <span></span>
+        <span></span>
       </div>
       <div class="menu-close">✕</div>
     </button>
@@ -54,7 +57,13 @@
           <div class="wish-panel-label">From</div>
           <div id="wishSender" class="wish-panel-sender"></div>
         </div>
-        <button id="wishCloseBtn" class="pill-close" aria-label="편지 닫기">✕</button>
+        <button
+          id="wishCloseBtn"
+          class="pill-close"
+          aria-label="편지 닫기"
+        >
+          ✕
+        </button>
       </div>
       <div class="wish-panel-body">
         <p id="wishContent"></p>
@@ -78,13 +87,20 @@
 
       <div class="form-group">
         <label for="wishNameInput">소원을 빌 사람 이름 (선택)</label>
-        <input id="wishNameInput" type="text" placeholder="예: 진환, 우리 팀 모두…" />
+        <input
+          id="wishNameInput"
+          type="text"
+          placeholder="예: 진환, 우리 팀 모두…"
+        />
       </div>
 
       <div class="form-group">
         <label for="wishTextInput">소원 내용</label>
-        <textarea id="wishTextInput" rows="4"
-                  placeholder="올해 이루고 싶은 소원을 적어보세요."></textarea>
+        <textarea
+          id="wishTextInput"
+          rows="4"
+          placeholder="올해 이루고 싶은 소원을 적어보세요."
+        ></textarea>
       </div>
 
       <div class="modal-actions">

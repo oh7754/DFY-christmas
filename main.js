@@ -77,13 +77,13 @@ const wishSenderEl = document.getElementById("wishSender");
 const wishContentEl = document.getElementById("wishContent");
 const wishCloseBtn = document.getElementById("wishCloseBtn");
 
+/* ========= 상태 ========= */
 
-// ===== 상태 =====
 let currentUser = null;
 let lastSnapshot = null;
 const shownImageIds = new Set();
 
-// 트리에 올라간 이미지 mesh들 → 소원 데이터 매핑
+// 트리의 이미지 mesh → 데이터 매핑
 const imageMeshes = [];
 const meshToData = new Map();
 
@@ -93,7 +93,6 @@ function isAllowedDomain(email) {
   return email && email.endsWith("@" + ALLOWED_DOMAIN);
 }
 
-// 이름이나 이메일에서 이니셜 뽑기
 function makeInitialFromUser(user) {
   if (!user) return "?";
   if (user.displayName && user.displayName.length > 0) {
@@ -117,19 +116,21 @@ function formatDate(ts) {
   }).format(d);
 }
 
-onAuthStateChanged(auth, (user) => {
+/* ========= Auth 상태 관리 ========= */
+
+onAuthStateChanged(auth, async (user) => {
+  // 회사 도메인 아닌 계정이면 바로 로그아웃
   if (user && !isAllowedDomain(user.email)) {
     alert("사내 구글 계정만 사용할 수 있습니다.");
-    signOut(auth).catch(() => {});
-    return;
+    await signOut(auth).catch(() => {});
+    currentUser = null;
+  } else {
+    currentUser = user || null;
   }
-
-  currentUser = user || null;
 
   if (currentUser) {
     const init = makeInitialFromUser(currentUser);
 
-    // 상단 프로필 이니셜 / 사진
     topInitial.textContent = init;
     if (currentUser.photoURL) {
       topImage.src = currentUser.photoURL;
@@ -152,7 +153,6 @@ onAuthStateChanged(auth, (user) => {
 
 /* ========= 프로필 캡슐 & 메뉴 버튼 ========= */
 
-// 패널 열기 / 닫기
 function openPanel() {
   if (!sidePanel || !topAccount || !menuToggle) return;
   sidePanel.classList.add("open");
@@ -169,7 +169,7 @@ function closePanel() {
   menuToggle.classList.remove("open");
 }
 
-// 햄버거/닫기 버튼
+// 햄버거 / X 버튼
 if (menuToggle) {
   menuToggle.addEventListener("click", () => {
     if (!sidePanel) return;
@@ -181,7 +181,7 @@ if (menuToggle) {
   });
 }
 
-// 프로필 캡슐 클릭:
+// 프로필 캡슐 클릭
 // - 로그인 안 되어 있으면: 로그인 팝업
 // - 로그인 되어 있으면: 패널 열기
 if (topAccount) {
@@ -202,11 +202,11 @@ if (topAccount) {
     }
   });
 
-  // 초기 상태: 접힌 상태
+  // 초기 상태: 접힘
   topAccount.classList.add("collapsed");
 }
 
-/* ========= 소원 추가 모달 토글 ========= */
+/* ========= 소원 추가 모달 ========= */
 
 function openWishModal() {
   if (!currentUser) {
@@ -219,15 +219,14 @@ function openWishModal() {
 function closeWishModal() {
   wishModal.classList.add("hidden");
   wishFileInput.value = "";
-  // 이름은 유지하고 싶으면 주석 처리
-  // wishNameInput.value = "";
+  // 이름은 유지, 소원 텍스트만 초기화
   wishTextInput.value = "";
 }
 
 openWishModalBtn.addEventListener("click", openWishModal);
 wishCancelBtn.addEventListener("click", closeWishModal);
 
-// 모달 바깥 클릭 시 닫기
+// 모달 바깥 영역 클릭 시 닫기
 wishModal.addEventListener("click", (e) => {
   if (e.target === wishModal || e.target.classList.contains("modal-backdrop")) {
     closeWishModal();
@@ -341,7 +340,6 @@ function getRandomPositionOnTree() {
   return new THREE.Vector3(x, y, z);
 }
 
-// Firestore 문서 한 개를 트리에 붙이기
 function addImageToTree(docId, data) {
   const texLoader = new THREE.TextureLoader();
   texLoader.load(
@@ -545,7 +543,7 @@ function renderMyWishes() {
 
   myDocs
     .slice()
-    .reverse() // 최근 것이 위로
+    .reverse()
     .forEach((docSnap) => {
       const data = docSnap.data();
 
