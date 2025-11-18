@@ -293,7 +293,7 @@ composer.addPass(renderPass);
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   0.1,  // strength: 글로우 세기 (1.0 ~ 2.0 사이에서 취향대로)
-  0.8,  // radius: 번지는 정도
+  0.2,  // radius: 번지는 정도
   0.7   // threshold: 0이면 꽤 많은 것들이 글로우, 0.8쯤 올리면 정말 밝은 것만
 );
 composer.addPass(bloomPass);
@@ -319,7 +319,7 @@ const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
 hemiLight.position.set(0, 1, 0);
 scene.add(hemiLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
 dirLight.position.set(5, 10, 5);
 scene.add(dirLight);
 
@@ -348,12 +348,120 @@ loader.load(
     treeModel.position.set(0, 0, 0);
     treeModel.scale.set(0.7, 0.7, 0.7);
     treeGroup.add(treeModel);
+
+    // 🔸 여기서 레이어별 셰이딩 적용
+    applyLayerShading(treeModel);
   },
   undefined,
   (error) => {
     console.error("트리 모델 로드 실패:", error);
   }
 );
+
+// 부모 체인까지 올라가며 "01" ~ "08" 같은 레이어 이름 찾기
+function getLayerIdFromHierarchy(obj) {
+  let node = obj;
+  while (node) {
+    if (node.name && node.name.match(/^\d{2}$/)) {
+      // 이름이 정확히 "01", "02" ... 이런 2자리 숫자인 경우
+      return node.name;
+    }
+    node = node.parent;
+  }
+  return null;
+}
+
+// =======================
+//  트리 레이어 셰이딩
+// =======================
+function applyLayerShading(root) {
+  // 레이어별 탑/바텀 컬러 정의
+  const greenTop    = new THREE.Color(0x003937); // 위쪽(어두운 초록)
+  const greenBottom = new THREE.Color(0x3FAC00); // 아래쪽(밝은 초록)
+
+  const brownTop    = new THREE.Color(0x5F4000); // 위쪽(밝은 갈색)
+  const brownBottom = new THREE.Color(0x2B0800); // 아래쪽(어두운 갈색)
+
+  const starColor   = new THREE.Color(0xFFB60C); // 01 레이어(별) 노랑
+
+  root.traverse((obj) => {
+    if (!obj.isMesh || !obj.geometry) return;
+
+    // 🔸 컬렉션 이름까지 포함해서 레이어 ID 찾기 ("01" ~ "08")
+    const layerId = getLayerIdFromHierarchy(obj);
+    if (!layerId) return;
+
+    // 버텍스 컬러를 입히기 위한 지오메트리 복제
+    let geo = obj.geometry.clone();
+    geo = geo.toNonIndexed();
+
+    const pos = geo.attributes.position;
+    const vertexCount = pos.count;
+
+    // y 범위 계산
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < vertexCount; i++) {
+      const y = pos.getY(i);
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const height = maxY - minY || 1;
+
+    const colors = new Float32Array(vertexCount * 3);
+    const color = new THREE.Color();
+
+    for (let i = 0; i < vertexCount; i++) {
+      const y = pos.getY(i);
+
+      // ⬇️ bottom(0) ~ top(1) 로 정규화
+      const tBottom = (y - minY) / height;
+
+      if (layerId === "01") {
+        // 01: 전체 노란색 (별)
+        color.copy(starColor);
+
+      } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
+        // 02~07: 위 어두운 초록(greenTop) → 아래 밝은 초록(greenBottom)
+        // bottom(0): greenBottom, top(1): greenTop
+        color.copy(greenBottom).lerp(greenTop, tBottom);
+
+      } else if (layerId === "08") {
+        // 08: 위 밝은 갈색(brownTop) → 아래 어두운 갈색(brownBottom)
+        // bottom(0): brownBottom, top(1): brownTop
+        color.copy(brownBottom).lerp(brownTop, tBottom);
+
+      } else {
+        // 기타 레이어 (필요 없으면 흰색 고정)
+        color.set(0xffffff);
+      }
+
+      colors[i * 3 + 0] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    obj.geometry = geo;
+
+    // vertexColors 사용하는 머티리얼로 변경
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      metalness: 0.4,
+      roughness: 0.8,
+    });
+
+    if (obj.material && obj.material.transparent) {
+      mat.transparent = true;
+      mat.opacity = obj.material.opacity;
+    }
+
+    obj.material = mat;
+  });
+}
+
+
+
 
 // ====== 동그라미 라이트 세트업 ======
 const LIGHT_COUNT = 15;
@@ -375,7 +483,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
   tmpColor.setHSL(hue, 0.85, 0.6);
 
   // 포인트 라이트 (조금 줄인 세기)
-  const light = new THREE.PointLight(tmpColor.clone(), 3.0, 10);
+  const light = new THREE.PointLight(tmpColor.clone(), 2.0, 10);
 
   // 궤도 파라미터
   const radius = THREE.MathUtils.lerp(
@@ -764,13 +872,23 @@ wishCloseBtn.addEventListener("click", closeWishPanel);
 
 let isDragging = false;
 let prevX = 0;
-let prevY = 0;
 const dragRotateSpeed = 0.005;
+
+// 마우스 위치(패럴럭스용, -1 ~ 1)
+let mouseX = 0;
+let mouseY = 0;
+
+// 기본 자동 회전 값
+let baseRotationY = 0;
+
+// 🔥 드래그 관성
+let spinVelocityY = 0;
+
 
 renderer.domElement.addEventListener("mousedown", (event) => {
   isDragging = true;
   prevX = event.clientX;
-  prevY = event.clientY;
+  spinVelocityY = 0;  // 새 드래그 시작할 때 관성 초기화
 });
 
 window.addEventListener("mouseup", () => {
@@ -778,19 +896,25 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  if (!isDragging) return;
-  const deltaX = event.clientX - prevX;
-  const deltaY = event.clientY - prevY;
-  prevX = event.clientX;
-  prevY = event.clientY;
+  // 패럴럭스용 마우스 위치 (-1 ~ 1)
+  mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+  mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
-  treeGroup.rotation.y += deltaX * dragRotateSpeed;
-  const newX = THREE.MathUtils.clamp(
-    treeGroup.rotation.x + deltaY * dragRotateSpeed,
-    -Math.PI / 6,
-    Math.PI / 6
-  );
-  treeGroup.rotation.x = newX;
+  if (!isDragging) return;
+
+  const deltaX = event.clientX - prevX;
+  prevX = event.clientX;
+
+  const deltaRot = deltaX * dragRotateSpeed;
+
+  // 드래그 시 트리 바로 회전
+  treeGroup.rotation.y += deltaRot;
+
+  // 기준 회전값도 맞춰두기
+  baseRotationY = treeGroup.rotation.y;
+
+  // 마지막 회전량을 관성 속도로 저장
+  spinVelocityY = deltaRot;
 });
 
 renderer.domElement.addEventListener(
@@ -831,10 +955,36 @@ function animate(time) {
   const delta = (time - lastTime) / 1000;
   lastTime = time;
 
-  if (!isDragging) treeGroup.rotation.y += delta * 0.2;
-  star.rotation.y -= delta * 0.4;
+  // 자동 회전 + 관성 (드래그 중일 땐 건드리지 않음)
+  if (!isDragging) {
+    const autoSpeed = 0.2;          // 기본 자동 회전 속도
 
-  // 포인트 라이트 궤도 애니메이션 + 구체 위치 복사
+    // 기본 자동 회전
+    baseRotationY += autoSpeed * delta;
+
+    // 드래그 관성
+    baseRotationY += spinVelocityY;
+    spinVelocityY *= 0.92;          // 관성 감쇠
+
+    const targetX = 0;              // 바닥에 고정 (기울기 X)
+    const targetY = baseRotationY;
+
+    treeGroup.rotation.x += (targetX - treeGroup.rotation.x) * 0.1;
+    treeGroup.rotation.y += (targetY - treeGroup.rotation.y) * 0.1;
+  }
+
+  // ⭐ 드래그 여부와 상관없이 항상 카메라 패럴럭스 적용
+  const baseCamY = 6;
+  const targetCamX = mouseX * 12;           // 좌우 살짝 움직임
+  const targetCamY = baseCamY + mouseY * 6; // 위아래 살짝 움직임
+
+  camera.position.x += (targetCamX - camera.position.x) * 0.05;
+  camera.position.y += (targetCamY - camera.position.y) * 0.05;
+
+  // 별 회전
+  star.rotation.y -= delta * 2;
+
+  // 라이트 애니메이션
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
     const { light, sphere, glow } = movingLights[i];
@@ -852,10 +1002,10 @@ function animate(time) {
     light.position.y = height + Math.sin(t * 0.9 + offset) * 0.4;
 
     sphere.position.copy(light.position);
-    glow.position.copy(light.position);   // 🔆 글로우도 따라가게
+    glow.position.copy(light.position);
   }
 
-
+  // 눈
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
     let y = pos.getY(i);
@@ -871,6 +1021,7 @@ function animate(time) {
   composer.render();
 }
 animate(0);
+
 
 /* ========= scene export ========= */
 
