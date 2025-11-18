@@ -2,6 +2,12 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
+// ★ 블룸용 postprocessing
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+
 // ===== Firebase CDN imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 import {
@@ -244,11 +250,26 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0; // 살짝 낮춰줌
 document.body.appendChild(renderer.domElement);
+
+// ★ 블룸 컴포저 세팅
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+// 화면에서 어느 정도 이상 밝은 애들만 글로우
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0,  // strength: 글로우 세기 (1.0 ~ 2.0 사이에서 취향대로)
+  0,  // radius: 번지는 정도
+  0   // threshold: 0이면 꽤 많은 것들이 글로우, 0.8쯤 올리면 정말 밝은 것만
+);
+composer.addPass(bloomPass);
 
 const treeGroup = new THREE.Group();
 scene.add(treeGroup);
+
 
 // 바닥
 const groundGeo = new THREE.CircleGeometry(18, 64);
@@ -311,7 +332,7 @@ const ORBIT_INNER_RADIUS = 5;
 const ORBIT_OUTER_RADIUS = 9;
 
 // 공통 지오메트리
-const lightSphereGeo = new THREE.SphereGeometry(0.05, 20, 20);
+const lightSphereGeo = new THREE.SphereGeometry(0.02, 10, 10);
 
 // 라이트 + 구체를 같이 들고 있을 배열
 const movingLights = [];
@@ -324,7 +345,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
   tmpColor.setHSL(hue, 0.85, 0.6);
 
   // 포인트 라이트
-  const light = new THREE.PointLight(tmpColor.clone(), 3.0, 14);
+  const light = new THREE.PointLight(tmpColor.clone(), 6, 8);
 
   // 궤도 파라미터
   const radius = THREE.MathUtils.lerp(
@@ -351,13 +372,13 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
 
   // 🔵 이 라이트의 색을 그대로 쓰는 구체 Mesh
   const mat = new THREE.MeshStandardMaterial({
-    color: tmpColor.clone(),         // 표면 색
-    emissive: tmpColor.clone(),      // 발광 색
-    emissiveIntensity: 1.0,
-    metalness: 0.0,
-    roughness: 0.2,
-    toneMapped: false                // 톤매핑 영향 X → 쨍하게
-  });
+  color: tmpColor.clone(),
+  emissive: tmpColor.clone(),
+  emissiveIntensity: 0.1, // 조금 더 강하게
+  metalness: 0.0,
+  roughness: 1,
+  toneMapped: false
+});
 
   const sphere = new THREE.Mesh(lightSphereGeo, mat);
   sphere.position.copy(light.position);
@@ -750,7 +771,9 @@ renderer.domElement.addEventListener(
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
 });
 
 /* ========= 애니메이션 루프 ========= */
@@ -797,7 +820,7 @@ function animate(time) {
   pos.needsUpdate = true;
 
   camera.lookAt(0, tree.position.y, 0);
-  renderer.render(scene, camera);
+  composer.render();
 }
 animate(0);
 
