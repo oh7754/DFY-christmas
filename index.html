@@ -4,7 +4,16 @@
   <meta charset="UTF-8" />
   <title>크리스마스 트리 갤러리</title>
   <link rel="stylesheet" href="style/style.css" />
-  
+
+  <!-- ✅ three / three/addons importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <!-- 상단 프로필 + 햄버거 버튼 -->
@@ -87,7 +96,7 @@
     </div>
   </div>
 
-  <!-- ✅ 딱 이 한 줄만! 다른 <script>는 전부 없애기 -->
+  <!-- ✅ 우리 앱 엔트리포인트 -->
   <script type="module" src="./main.js"></script>
 </body>
 </html>

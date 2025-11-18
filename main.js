@@ -1,6 +1,6 @@
-// ===== three.js & GLTFLoader (CDN ESM) =====
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js";
+// ===== three.js & GLTFLoader (importmap 버전) =====
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 // ===== Firebase CDN imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -306,42 +306,24 @@ loader.load(
 // ====== 동그라미 라이트 세트업 ======
 const LIGHT_COUNT = 15;
 
-// 중앙에서 떨어지는 최소/최대 반지름
-const ORBIT_INNER_RADIUS = 0;   // 트리 근처
-const ORBIT_OUTER_RADIUS = 9;   // 너무 멀지는 않게
+// 트리 반경이 약 4라서, 그보다 살짝 바깥을 돌게
+const ORBIT_INNER_RADIUS = 5;
+const ORBIT_OUTER_RADIUS = 9;
 
-// 동그라미(라이트 아이콘) 지오메트리 & 머티리얼
-const lightSphereGeo = new THREE.SphereGeometry(0.3, 24, 24); // ★ 크기 키움
-const lightSphereMat = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  vertexColors: true,            // 인스턴스 컬러 사용
-  transparent: true,
-  opacity: 1.0,
-  blending: THREE.AdditiveBlending, // 겹칠수록 밝게
-  depthWrite: false,
-  toneMapped: false,             // 톤매핑 영향 안 받게 (항상 쨍하게)
-});
+// 공통 지오메트리
+const lightSphereGeo = new THREE.SphereGeometry(0.05, 20, 20);
 
-const lightHelpers = new THREE.InstancedMesh(
-  lightSphereGeo,
-  lightSphereMat,
-  LIGHT_COUNT
-);
-lightHelpers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-scene.add(lightHelpers);
-
+// 라이트 + 구체를 같이 들고 있을 배열
 const movingLights = [];
 const tmpColor = new THREE.Color();
 
 for (let i = 0; i < LIGHT_COUNT; i++) {
-  // HSL 예쁜 랜덤 색
+
+  // 예쁜 랜덤 색 (HSL)
   const hue = Math.random();
   tmpColor.setHSL(hue, 0.85, 0.6);
 
-  // 인스턴스 색
-  lightHelpers.setColorAt(i, tmpColor);
-
-  // 실제 포인트 라이트도 같은 색
+  // 포인트 라이트
   const light = new THREE.PointLight(tmpColor.clone(), 3.0, 14);
 
   // 궤도 파라미터
@@ -351,7 +333,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
     Math.random()
   );
   const angle = Math.random() * Math.PI * 2;
-  const height = 3.0 + Math.random() * 3.0;
+  const height = 3.5 + Math.random() * 3.0;
 
   light.userData.radius = radius;
   light.userData.baseAngle = angle;
@@ -365,15 +347,27 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
     height,
     Math.sin(angle) * radius
   );
-
   scene.add(light);
-  movingLights.push(light);
+
+  // 🔵 이 라이트의 색을 그대로 쓰는 구체 Mesh
+  const mat = new THREE.MeshStandardMaterial({
+    color: tmpColor.clone(),         // 표면 색
+    emissive: tmpColor.clone(),      // 발광 색
+    emissiveIntensity: 1.0,
+    metalness: 0.0,
+    roughness: 0.2,
+    toneMapped: false                // 톤매핑 영향 X → 쨍하게
+  });
+
+  const sphere = new THREE.Mesh(lightSphereGeo, mat);
+  sphere.position.copy(light.position);
+  sphere.frustumCulled = false;      // 혹시라도 카메라 밖으로 판단되어 안 지워지게
+  scene.add(sphere);
+
+  // 라이트와 구체를 같이 저장
+  movingLights.push({ light, sphere });
 }
 
-// 인스턴스 컬러 버퍼 갱신
-if (lightHelpers.instanceColor) {
-  lightHelpers.instanceColor.needsUpdate = true;
-}
 
 
 // 눈 파티클
@@ -770,10 +764,10 @@ function animate(time) {
   if (!isDragging) treeGroup.rotation.y += delta * 0.2;
   star.rotation.y -= delta * 0.4;
 
-  // 포인트 라이트 궤도 애니메이션 + 헬퍼 위치 복사
+  // 포인트 라이트 궤도 애니메이션 + 구체 위치 복사
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
-    const light = movingLights[i];
+    const { light, sphere } = movingLights[i];
 
     const radius = light.userData.radius;
     const baseAngle = light.userData.baseAngle;
@@ -787,10 +781,9 @@ function animate(time) {
     light.position.z = Math.sin(angle) * radius;
     light.position.y = height + Math.sin(t * 0.9 + offset) * 0.4;
 
-    light.updateMatrixWorld();
-    lightHelpers.setMatrixAt(i, light.matrixWorld);
+    sphere.position.copy(light.position);
   }
-  lightHelpers.instanceMatrix.needsUpdate = true;
+
 
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
