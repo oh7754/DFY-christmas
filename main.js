@@ -2,11 +2,10 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-// ★ 블룸용 postprocessing
+// ★ postprocessing (Bloom → ❌, DOF용 BokehPass만 사용)
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 
 // ===== Firebase CDN imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -38,7 +37,9 @@ import {
 
 console.log("🚀 dfy main.js loaded");
 
-// === Firebase 설정 ===
+/* ============================================================================
+ *  Firebase 기본 세팅
+ * ==========================================================================*/
 const firebaseConfig = {
   apiKey: "AIzaSyB_bZoaw6cvdrot7DEabrXsfyDYM-ZgaR0",
   authDomain: "dfy-christmas-tree-452d4.firebaseapp.com",
@@ -49,7 +50,6 @@ const firebaseConfig = {
   measurementId: "G-7TTVR9EM4E",
 };
 
-// Firebase 초기화
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
@@ -57,10 +57,12 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const imagesCol = collection(db, "treeImages");
 
-// 🔴 회사 도메인
+// 🔴 회사 도메인 제한
 const ALLOWED_DOMAIN = "dfy.co.kr";
 
-/* ========= DOM 요소 ========= */
+/* ============================================================================
+ *  DOM 요소
+ * ==========================================================================*/
 
 // 상단 UI
 const topAccount = document.getElementById("topAccount");
@@ -87,7 +89,9 @@ const wishSenderEl = document.getElementById("wishSender");
 const wishContentEl = document.getElementById("wishContent");
 const wishCloseBtn = document.getElementById("wishCloseBtn");
 
-/* ========= 상태 ========= */
+/* ============================================================================
+ *  상태
+ * ==========================================================================*/
 
 let currentUser = null;
 let lastSnapshot = null;
@@ -97,7 +101,9 @@ const shownImageIds = new Set();
 const imageMeshes = [];
 const meshToData = new Map();
 
-/* ========= 유틸 ========= */
+/* ============================================================================
+ *  유틸 함수
+ * ==========================================================================*/
 
 function isAllowedDomain(email) {
   return email && email.endsWith("@" + ALLOWED_DOMAIN);
@@ -126,7 +132,9 @@ function formatDate(ts) {
   }).format(d);
 }
 
-/* ========= Auth 상태 ========= */
+/* ============================================================================
+ *  Auth 상태 감시
+ * ==========================================================================*/
 
 onAuthStateChanged(auth, async (user) => {
   if (user && !isAllowedDomain(user.email)) {
@@ -160,7 +168,9 @@ onAuthStateChanged(auth, async (user) => {
   renderMyWishes();
 });
 
-/* ========= 상단 프로필 & 패널 ========= */
+/* ============================================================================
+ *  상단 프로필 & 사이드 패널
+ * ==========================================================================*/
 
 function openPanel() {
   if (!sidePanel || !topAccount || !menuToggle) return;
@@ -207,7 +217,9 @@ if (topAccount) {
   topAccount.classList.add("collapsed");
 }
 
-/* ========= 소원 추가 모달 ========= */
+/* ============================================================================
+ *  소원 업로드 모달
+ * ==========================================================================*/
 
 function openWishModal() {
   if (!currentUser) {
@@ -232,14 +244,17 @@ wishModal.addEventListener("click", (e) => {
   }
 });
 
-// 🔆 라이트 글로우용 캔버스 텍스처 생성
+/* ============================================================================
+ *  캔버스 텍스처 (글로우 / 바닥 라이트 오버레이)
+ * ==========================================================================*/
+
+// 🔆 라이트 글로우용 캔버스 텍스처
 function createGlowTexture() {
   const size = 128;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
 
-  // 가운데가 밝고 가장자리로 갈수록 투명해지는 그라디언트
   const grd = ctx.createRadialGradient(
     size / 2,
     size / 2,
@@ -250,7 +265,7 @@ function createGlowTexture() {
   );
   grd.addColorStop(0.0, "rgba(255,255,255,1)");
   grd.addColorStop(0.1, "rgba(255,255,255,0.1)");
-  grd.addColorStop(.5, "rgba(255, 255, 255,0)");
+  grd.addColorStop(0.5, "rgba(255,255,255,0)");
 
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, size, size);
@@ -262,11 +277,40 @@ function createGlowTexture() {
 
 const glowTexture = createGlowTexture();
 
+// 바닥 라이트 오버레이용 텍스처 (중앙 밝음 → 바깥 투명)
+function createGroundLightOverlayTexture(size = 512) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
 
-/* ========= THREE.js 씬 (WebGLRenderer) ========= */
+  const grd = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2
+  );
+  grd.addColorStop(0.0, "rgba(255,255,255,0.6)");
+  grd.addColorStop(0.4, "rgba(255,255,255,0.25)");
+  grd.addColorStop(1.0, "rgba(255,255,255,0)");
+
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, size, size);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/* ============================================================================
+ *  THREE.js 씬 / 렌더러 / 포스트프로세싱
+ * ==========================================================================*/
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020617);
 
 const camera = new THREE.PerspectiveCamera(
   45,
@@ -276,45 +320,85 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 6, 18);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true, // body 배경색 보이게
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0; // 살짝 낮춰줌
+renderer.toneMappingExposure = 1.0;
+renderer.setClearColor(0x000000, 0); // 완전 투명 (body 단색 배경 사용)
 document.body.appendChild(renderer.domElement);
 
-// ★ 블룸 컴포저 세팅
+// ==== DOF용 포스트프로세싱 컴포저 (Bloom 없음) ====
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-// 화면에서 어느 정도 이상 밝은 애들만 글로우
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.1,  // strength: 글로우 세기 (1.0 ~ 2.0 사이에서 취향대로)
-  0.2,  // radius: 번지는 정도
-  0.7   // threshold: 0이면 꽤 많은 것들이 글로우, 0.8쯤 올리면 정말 밝은 것만
-);
-composer.addPass(bloomPass);
+// BokehPass 파라미터 (나중에 튜닝용)
+const bokehParams = {
+  focus: 20.0,              // 카메라로부터 초점 거리 (대략 트리 중심 거리 근처)
+  aperture: 0.0002,         // 조리개 (값이 작을수록 심도 깊고, 클수록 심도 얕음)
+  maxblur: 0.01,            // 최대 블러 강도
+  width: window.innerWidth,
+  height: window.innerHeight,
+};
 
+const bokehPass = new BokehPass(scene, camera, bokehParams);
+composer.addPass(bokehPass);
+
+// 트리 루트 그룹
 const treeGroup = new THREE.Group();
 scene.add(treeGroup);
 
 
-// 바닥
+/* ============================================================================
+ *  바닥: 기본 컬러 + 그 위에 원형 라이트 디스크
+ * ==========================================================================*/
+
+// 1) 기본 바닥(이미 있는 ground) 유지
 const groundGeo = new THREE.CircleGeometry(18, 64);
 const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x0b1220,
+  color: 0x050816, // 바닥 기본 색
   metalness: 0.2,
-  roughness: 0.8,
+  roughness: 0.9,
+  transparent: true,
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 scene.add(ground);
 
-// 조명
+// 2) glowTexture를 그대로 바닥용 디스크로 사용
+function createGroundGlowDisk(radius = 12, segments = 64) {
+  const geo = new THREE.CircleGeometry(radius, segments);
+
+  const mat = new THREE.MeshBasicMaterial({
+    map: glowTexture,                // 🔴 위에서 만든 glowTexture 그대로 사용
+    color: 0x000000,                // 필요하면 살짝 색 틴트 가능 (예: 0x9afcff)
+    transparent: true,
+    depthWrite: true,              // z-buffer 안 남기기 (오버레이 느낌)
+    blending: THREE.AdditiveBlending, // 빛이 번지는 느낌
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.01;          // 바닥보다 살짝 위로 띄워서 z-fighting 방지
+  return mesh;
+}
+
+const groundGlow = createGroundGlowDisk(24, 64);
+scene.add(groundGlow);
+
+
+
+
+/* ============================================================================
+ *  조명
+ * ==========================================================================*/
+
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
 hemiLight.position.set(0, 1, 0);
 scene.add(hemiLight);
@@ -323,12 +407,18 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
 dirLight.position.set(5, 10, 5);
 scene.add(dirLight);
 
-// 트리 치수(소원 위치 계산용)
-const treeHeight = 8;
-const treeRadius = 4;
+/* ============================================================================
+ *  트리 & 레이어 셰이딩
+ * ==========================================================================*/
+
+const treeHeight = 9;
+const treeRadius = 3.6;
 const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-// dummy 트리 / 별
+// DOF용 포커스 타깃 (트리 중심 근처)
+const dofTarget = new THREE.Vector3(0, TREE_CENTER_Y, 0);
+
+// dummy 위치용
 const tree = new THREE.Object3D();
 tree.position.y = TREE_CENTER_Y;
 treeGroup.add(tree);
@@ -337,7 +427,6 @@ const star = new THREE.Object3D();
 star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
 
-// GLB 트리 로드
 const loader = new GLTFLoader();
 let treeModel = null;
 
@@ -349,7 +438,7 @@ loader.load(
     treeModel.scale.set(0.7, 0.7, 0.7);
     treeGroup.add(treeModel);
 
-    // 🔸 여기서 레이어별 셰이딩 적용
+    // 레이어 이름(01~08)에 따라 색 입히기
     applyLayerShading(treeModel);
   },
   undefined,
@@ -358,12 +447,11 @@ loader.load(
   }
 );
 
-// 부모 체인까지 올라가며 "01" ~ "08" 같은 레이어 이름 찾기
+// 부모 체인까지 올라가며 "01" ~ "08" 레이어 이름 찾기
 function getLayerIdFromHierarchy(obj) {
   let node = obj;
   while (node) {
     if (node.name && node.name.match(/^\d{2}$/)) {
-      // 이름이 정확히 "01", "02" ... 이런 2자리 숫자인 경우
       return node.name;
     }
     node = node.parent;
@@ -371,34 +459,28 @@ function getLayerIdFromHierarchy(obj) {
   return null;
 }
 
-// =======================
-//  트리 레이어 셰이딩
-// =======================
+// 트리 레이어 셰이딩
 function applyLayerShading(root) {
-  // 레이어별 탑/바텀 컬러 정의
   const greenTop    = new THREE.Color(0x003937); // 위쪽(어두운 초록)
-  const greenBottom = new THREE.Color(0x3FAC00); // 아래쪽(밝은 초록)
+  const greenBottom = new THREE.Color(0x3fac00); // 아래쪽(밝은 초록)
 
-  const brownTop    = new THREE.Color(0x5F4000); // 위쪽(밝은 갈색)
-  const brownBottom = new THREE.Color(0x2B0800); // 아래쪽(어두운 갈색)
+  const brownTop    = new THREE.Color(0x5f4000); // 위쪽(밝은 갈색)
+  const brownBottom = new THREE.Color(0x2b0800); // 아래쪽(어두운 갈색)
 
-  const starColor   = new THREE.Color(0xFFB60C); // 01 레이어(별) 노랑
+  const starColor   = new THREE.Color(0xffb60c); // 01: 별 색
 
   root.traverse((obj) => {
     if (!obj.isMesh || !obj.geometry) return;
 
-    // 🔸 컬렉션 이름까지 포함해서 레이어 ID 찾기 ("01" ~ "08")
     const layerId = getLayerIdFromHierarchy(obj);
     if (!layerId) return;
 
-    // 버텍스 컬러를 입히기 위한 지오메트리 복제
     let geo = obj.geometry.clone();
     geo = geo.toNonIndexed();
 
     const pos = geo.attributes.position;
     const vertexCount = pos.count;
 
-    // y 범위 계산
     let minY = Infinity;
     let maxY = -Infinity;
     for (let i = 0; i < vertexCount; i++) {
@@ -413,26 +495,17 @@ function applyLayerShading(root) {
 
     for (let i = 0; i < vertexCount; i++) {
       const y = pos.getY(i);
-
-      // ⬇️ bottom(0) ~ top(1) 로 정규화
-      const tBottom = (y - minY) / height;
+      const tBottom = (y - minY) / height; // bottom(0) ~ top(1)
 
       if (layerId === "01") {
-        // 01: 전체 노란색 (별)
         color.copy(starColor);
-
       } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
-        // 02~07: 위 어두운 초록(greenTop) → 아래 밝은 초록(greenBottom)
-        // bottom(0): greenBottom, top(1): greenTop
+        // 02~07: 아래 밝은 초록 → 위 어두운 초록
         color.copy(greenBottom).lerp(greenTop, tBottom);
-
       } else if (layerId === "08") {
-        // 08: 위 밝은 갈색(brownTop) → 아래 어두운 갈색(brownBottom)
-        // bottom(0): brownBottom, top(1): brownTop
+        // 08: 아래 어두운 갈색 → 위 밝은 갈색
         color.copy(brownBottom).lerp(brownTop, tBottom);
-
       } else {
-        // 기타 레이어 (필요 없으면 흰색 고정)
         color.set(0xffffff);
       }
 
@@ -444,7 +517,6 @@ function applyLayerShading(root) {
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     obj.geometry = geo;
 
-    // vertexColors 사용하는 머티리얼로 변경
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       metalness: 0.4,
@@ -460,32 +532,24 @@ function applyLayerShading(root) {
   });
 }
 
+/* ============================================================================
+ *  트리 주변 도는 라이트들
+ * ==========================================================================*/
 
-
-
-// ====== 동그라미 라이트 세트업 ======
 const LIGHT_COUNT = 15;
-
-// 트리 반경이 약 4라서, 그보다 살짝 바깥을 돌게
 const ORBIT_INNER_RADIUS = 5;
 const ORBIT_OUTER_RADIUS = 9;
 
-// 공통 지오메트리
 const lightSphereGeo = new THREE.SphereGeometry(0.02, 10, 10);
-
-// 라이트 + 구체를 같이 들고 있을 배열
 const movingLights = [];
 const tmpColor = new THREE.Color();
 
 for (let i = 0; i < LIGHT_COUNT; i++) {
-  // 예쁜 랜덤 색 (HSL)
   const hue = Math.random();
   tmpColor.setHSL(hue, 0.85, 0.6);
 
-  // 포인트 라이트 (조금 줄인 세기)
   const light = new THREE.PointLight(tmpColor.clone(), 2.0, 10);
 
-  // 궤도 파라미터
   const radius = THREE.MathUtils.lerp(
     ORBIT_INNER_RADIUS,
     ORBIT_OUTER_RADIUS,
@@ -500,7 +564,6 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
   light.userData.speed = 0.4 + Math.random() * 0.4;
   light.userData.offset = Math.random() * Math.PI * 2;
 
-  // 초기 위치
   light.position.set(
     Math.cos(angle) * radius,
     height,
@@ -508,21 +571,19 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
   );
   scene.add(light);
 
-  // 💡 실제 작은 구체 (코어)
   const sphereMat = new THREE.MeshStandardMaterial({
     color: tmpColor.clone(),
     emissive: tmpColor.clone(),
     emissiveIntensity: 0.8,
     metalness: 0.0,
     roughness: 0.3,
-    toneMapped: false, // 톤매핑 영향 X → 쨍
+    toneMapped: false,
   });
   const sphere = new THREE.Mesh(lightSphereGeo, sphereMat);
   sphere.position.copy(light.position);
   sphere.frustumCulled = false;
   scene.add(sphere);
 
-  // 🔆 블러리한 글로우 스프라이트 (헤일로)
   const glowMat = new THREE.SpriteMaterial({
     map: glowTexture,
     color: tmpColor.clone(),
@@ -534,19 +595,17 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
 
   const glow = new THREE.Sprite(glowMat);
   glow.position.copy(light.position);
-
-  // 스케일 = 화면에서 보이는 글로우 크기 (트리 스케일 보고 조절)
-  const glowSize = 0.9; // 0.5 ~ 1.2 정도에서 취향 맞춰봐
+  const glowSize = 0.9;
   glow.scale.set(glowSize, glowSize, 1);
   scene.add(glow);
 
-  // 세 개를 같이 저장
   movingLights.push({ light, sphere, glow });
 }
 
+/* ============================================================================
+ *  눈 파티클
+ * ==========================================================================*/
 
-
-// 눈 파티클
 const snowCount = 600;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
@@ -560,7 +619,9 @@ const snowMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.06 });
 const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
-/* ========= 트리에 이미지 추가 ========= */
+/* ============================================================================
+ *  트리에 이미지(소원 카드) 추가
+ * ==========================================================================*/
 
 function getRandomPositionOnTree() {
   const yMin = tree.position.y - treeHeight / 2 + 0.5;
@@ -610,7 +671,9 @@ function addImageToTree(docId, data) {
   );
 }
 
-/* ========= Firestore 실시간 구독 ========= */
+/* ============================================================================
+ *  Firestore 실시간 구독
+ * ==========================================================================*/
 
 const q = query(imagesCol, orderBy("createdAt", "asc"));
 onSnapshot(q, (snapshot) => {
@@ -628,7 +691,9 @@ onSnapshot(q, (snapshot) => {
   renderMyWishes();
 });
 
-/* ========= 이미지 리사이즈 & 업로드 ========= */
+/* ============================================================================
+ *  이미지 압축 & 업로드
+ * ==========================================================================*/
 
 function compressImage(file) {
   const MAX_WIDTH = 1920;
@@ -710,7 +775,6 @@ async function uploadAndRegister(file) {
   });
 }
 
-// 모달 "올리기"
 wishSubmitBtn.addEventListener("click", async () => {
   if (!currentUser) {
     alert("먼저 로그인 해주세요.");
@@ -730,7 +794,9 @@ wishSubmitBtn.addEventListener("click", async () => {
   }
 });
 
-/* ========= 내 소원 리스트 렌더링 ========= */
+/* ============================================================================
+ *  내 소원 리스트 렌더링
+ * ==========================================================================*/
 
 function renderMyWishes() {
   if (!myWishList) return;
@@ -824,7 +890,9 @@ async function handleDeleteImage(docId, data) {
   }
 }
 
-/* ========= 트리 이미지 클릭 → 편지 ========= */
+/* ============================================================================
+ *  트리 이미지 클릭 → 편지 패널
+ * ==========================================================================*/
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -868,27 +936,25 @@ function closeWishPanel() {
 
 wishCloseBtn.addEventListener("click", closeWishPanel);
 
-/* ========= 드래그 회전 / 줌 / 리사이즈 ========= */
+/* ============================================================================
+ *  드래그 회전 / 줌 / 리사이즈
+ * ==========================================================================*/
 
 let isDragging = false;
 let prevX = 0;
 const dragRotateSpeed = 0.005;
 
-// 마우스 위치(패럴럭스용, -1 ~ 1)
+// 패럴럭스용 마우스 위치 (-1 ~ 1)
 let mouseX = 0;
 let mouseY = 0;
 
-// 기본 자동 회전 값
 let baseRotationY = 0;
-
-// 🔥 드래그 관성
-let spinVelocityY = 0;
-
+let spinVelocityY = 0; // 관성
 
 renderer.domElement.addEventListener("mousedown", (event) => {
   isDragging = true;
   prevX = event.clientX;
-  spinVelocityY = 0;  // 새 드래그 시작할 때 관성 초기화
+  spinVelocityY = 0;
 });
 
 window.addEventListener("mouseup", () => {
@@ -896,7 +962,7 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  // 패럴럭스용 마우스 위치 (-1 ~ 1)
+  // 월드 패럴럭스는 드래그 중에도 유지
   mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
@@ -907,13 +973,8 @@ window.addEventListener("mousemove", (event) => {
 
   const deltaRot = deltaX * dragRotateSpeed;
 
-  // 드래그 시 트리 바로 회전
   treeGroup.rotation.y += deltaRot;
-
-  // 기준 회전값도 맞춰두기
   baseRotationY = treeGroup.rotation.y;
-
-  // 마지막 회전량을 관성 속도로 저장
   spinVelocityY = deltaRot;
 });
 
@@ -945,38 +1006,42 @@ window.addEventListener("resize", () => {
 
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
+
+  // 🔁 BokehPass도 새 사이즈로 갱신
+  bokehPass.setSize(window.innerWidth, window.innerHeight);
 });
 
+
+/* ============================================================================
+ *  애니메이션 루프
+ * ==========================================================================*/
 /* ========= 애니메이션 루프 ========= */
 
 let lastTime = 0;
+
 function animate(time) {
   requestAnimationFrame(animate);
   const delta = (time - lastTime) / 1000;
   lastTime = time;
 
-  // 자동 회전 + 관성 (드래그 중일 땐 건드리지 않음)
+  // 자동 회전 + 드래그 관성
   if (!isDragging) {
-    const autoSpeed = 0.2;          // 기본 자동 회전 속도
-
-    // 기본 자동 회전
+    const autoSpeed = 0.2;
     baseRotationY += autoSpeed * delta;
-
-    // 드래그 관성
     baseRotationY += spinVelocityY;
-    spinVelocityY *= 0.92;          // 관성 감쇠
+    spinVelocityY *= 0.92;
 
-    const targetX = 0;              // 바닥에 고정 (기울기 X)
+    const targetX = 0;
     const targetY = baseRotationY;
 
     treeGroup.rotation.x += (targetX - treeGroup.rotation.x) * 0.1;
     treeGroup.rotation.y += (targetY - treeGroup.rotation.y) * 0.1;
   }
 
-  // ⭐ 드래그 여부와 상관없이 항상 카메라 패럴럭스 적용
+  // 카메라 패럴럭스
   const baseCamY = 6;
-  const targetCamX = mouseX * 12;           // 좌우 살짝 움직임
-  const targetCamY = baseCamY + mouseY * 6; // 위아래 살짝 움직임
+  const targetCamX = mouseX * 12;
+  const targetCamY = baseCamY + mouseY * 6;
 
   camera.position.x += (targetCamX - camera.position.x) * 0.05;
   camera.position.y += (targetCamY - camera.position.y) * 0.05;
@@ -984,7 +1049,7 @@ function animate(time) {
   // 별 회전
   star.rotation.y -= delta * 2;
 
-  // 라이트 애니메이션
+  // 라이트 궤도
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
     const { light, sphere, glow } = movingLights[i];
@@ -1005,7 +1070,7 @@ function animate(time) {
     glow.position.copy(light.position);
   }
 
-  // 눈
+  // 눈 떨어지는 애니메이션
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
     let y = pos.getY(i);
@@ -1017,13 +1082,19 @@ function animate(time) {
   }
   pos.needsUpdate = true;
 
+  // 🔍 DOF 포커스 업데이트 (dofTarget = 트리 중심 벡터)
+  bokehPass.uniforms.focus.value = camera.position.distanceTo(dofTarget);
+
   camera.lookAt(0, tree.position.y, 0);
-  composer.render();
+  composer.render();   // renderer.render(X)
 }
+
 animate(0);
 
 
-/* ========= scene export ========= */
+/* ============================================================================
+ *  scene export
+ * ==========================================================================*/
 
 window.exportScene = function () {
   const json = scene.toJSON();
