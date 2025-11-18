@@ -232,6 +232,37 @@ wishModal.addEventListener("click", (e) => {
   }
 });
 
+// 🔆 라이트 글로우용 캔버스 텍스처 생성
+function createGlowTexture() {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  // 가운데가 밝고 가장자리로 갈수록 투명해지는 그라디언트
+  const grd = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2
+  );
+  grd.addColorStop(0.0, "rgba(255,255,255,1)");
+  grd.addColorStop(0.1, "rgba(255,255,255,0.1)");
+  grd.addColorStop(.5, "rgba(255, 255, 255,0)");
+
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+const glowTexture = createGlowTexture();
+
+
 /* ========= THREE.js 씬 (WebGLRenderer) ========= */
 
 const scene = new THREE.Scene();
@@ -261,9 +292,9 @@ composer.addPass(renderPass);
 // 화면에서 어느 정도 이상 밝은 애들만 글로우
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0,  // strength: 글로우 세기 (1.0 ~ 2.0 사이에서 취향대로)
-  0,  // radius: 번지는 정도
-  0   // threshold: 0이면 꽤 많은 것들이 글로우, 0.8쯤 올리면 정말 밝은 것만
+  0.1,  // strength: 글로우 세기 (1.0 ~ 2.0 사이에서 취향대로)
+  0.8,  // radius: 번지는 정도
+  0.7   // threshold: 0이면 꽤 많은 것들이 글로우, 0.8쯤 올리면 정말 밝은 것만
 );
 composer.addPass(bloomPass);
 
@@ -339,13 +370,12 @@ const movingLights = [];
 const tmpColor = new THREE.Color();
 
 for (let i = 0; i < LIGHT_COUNT; i++) {
-
   // 예쁜 랜덤 색 (HSL)
   const hue = Math.random();
   tmpColor.setHSL(hue, 0.85, 0.6);
 
-  // 포인트 라이트
-  const light = new THREE.PointLight(tmpColor.clone(), 6, 8);
+  // 포인트 라이트 (조금 줄인 세기)
+  const light = new THREE.PointLight(tmpColor.clone(), 3.0, 10);
 
   // 궤도 파라미터
   const radius = THREE.MathUtils.lerp(
@@ -370,23 +400,40 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
   );
   scene.add(light);
 
-  // 🔵 이 라이트의 색을 그대로 쓰는 구체 Mesh
-  const mat = new THREE.MeshStandardMaterial({
-  color: tmpColor.clone(),
-  emissive: tmpColor.clone(),
-  emissiveIntensity: 0.1, // 조금 더 강하게
-  metalness: 0.0,
-  roughness: 1,
-  toneMapped: false
-});
-
-  const sphere = new THREE.Mesh(lightSphereGeo, mat);
+  // 💡 실제 작은 구체 (코어)
+  const sphereMat = new THREE.MeshStandardMaterial({
+    color: tmpColor.clone(),
+    emissive: tmpColor.clone(),
+    emissiveIntensity: 0.8,
+    metalness: 0.0,
+    roughness: 0.3,
+    toneMapped: false, // 톤매핑 영향 X → 쨍
+  });
+  const sphere = new THREE.Mesh(lightSphereGeo, sphereMat);
   sphere.position.copy(light.position);
-  sphere.frustumCulled = false;      // 혹시라도 카메라 밖으로 판단되어 안 지워지게
+  sphere.frustumCulled = false;
   scene.add(sphere);
 
-  // 라이트와 구체를 같이 저장
-  movingLights.push({ light, sphere });
+  // 🔆 블러리한 글로우 스프라이트 (헤일로)
+  const glowMat = new THREE.SpriteMaterial({
+    map: glowTexture,
+    color: tmpColor.clone(),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+  });
+
+  const glow = new THREE.Sprite(glowMat);
+  glow.position.copy(light.position);
+
+  // 스케일 = 화면에서 보이는 글로우 크기 (트리 스케일 보고 조절)
+  const glowSize = 0.9; // 0.5 ~ 1.2 정도에서 취향 맞춰봐
+  glow.scale.set(glowSize, glowSize, 1);
+  scene.add(glow);
+
+  // 세 개를 같이 저장
+  movingLights.push({ light, sphere, glow });
 }
 
 
@@ -790,7 +837,7 @@ function animate(time) {
   // 포인트 라이트 궤도 애니메이션 + 구체 위치 복사
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
-    const { light, sphere } = movingLights[i];
+    const { light, sphere, glow } = movingLights[i];
 
     const radius = light.userData.radius;
     const baseAngle = light.userData.baseAngle;
@@ -805,6 +852,7 @@ function animate(time) {
     light.position.y = height + Math.sin(t * 0.9 + offset) * 0.4;
 
     sphere.position.copy(light.position);
+    glow.position.copy(light.position);   // 🔆 글로우도 따라가게
   }
 
 
