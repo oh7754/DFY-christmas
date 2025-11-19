@@ -97,9 +97,13 @@ let currentUser = null;
 let lastSnapshot = null;
 const shownImageIds = new Set();
 
-// 트리 이미지 mesh → 데이터 매핑
+// 트리 이미지 mesh → 데이터 매핑 (클릭용)
 const imageMeshes = [];
 const meshToData = new Map();
+
+// 🌲 가지에 매달린 카드 피직스용 (좌우 스윙만)
+// { hanger, angle, vel, stiffness, damping }
+const hangingObjects = [];
 
 /* ============================================================================
  *  유틸 함수
@@ -315,29 +319,30 @@ camera.position.set(0, 6, 18);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
-  alpha: true, // body 배경색과 섞이게
+  alpha: true, // body 배경과 섞이게
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;                 // ✅ 그림자 켜기
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // 부드러운 그림자
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.setClearColor(0x000110); // 어두운 단색 배경
 document.body.appendChild(renderer.domElement);
 
-// ==== DOF용 포스트프로세싱 컴포저 (현재는 값 0이라 효과 없음) ====
+// 🔧 포스트프로세싱 (지금은 DOF 파라미터 0이라 효과 없음, 나중에 쓸 수 있음)
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
 const bokehParams = {
-  focus: 0.0,               // 나중에 다시 쓸 예정
+  focus: 0.0,
   aperture: 0.0,
   maxblur: 0.0,
   width: window.innerWidth,
   height: window.innerHeight,
 };
-
 const bokehPass = new BokehPass(scene, camera, bokehParams);
 composer.addPass(bokehPass);
 
@@ -351,26 +356,45 @@ scene.add(treeGroup);
 
 const groundGeo = new THREE.CircleGeometry(18, 64);
 const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x000110, // 바닥 기본 색 (배경이랑 톤 맞게)
+  color: 0x000110,
   metalness: 0.2,
   roughness: 0.9,
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
+ground.receiveShadow = true; // ✅ 바닥 그림자 받기
 scene.add(ground);
 
 /* ============================================================================
  *  조명
  * ==========================================================================*/
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 1);
+// 상하 방향 전체 라이트
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.4);
 hemiLight.position.set(0, 1, 0);
 scene.add(hemiLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-dirLight.position.set(5, 10, 5);
-scene.add(dirLight);
+// 🔦 메인 스포트라이트 (위에서 트리 비추는 느낌)
+const spotLight = new THREE.SpotLight(
+  0xffffff,      // color
+  4.0,           // intensity
+  60,            // distance
+  Math.PI / 2.5, // angle
+  1.0,           // penumbra
+  4.0            // decay
+);
+spotLight.castShadow = true;
+spotLight.shadow.mapSize.set(1024, 1024);
+spotLight.shadow.camera.near = 5;
+spotLight.shadow.camera.far = 60;
+spotLight.shadow.bias = -0.0001;
+spotLight.shadow.normalBias = 0.01;
+
+spotLight.position.set(0, 20, 0);
+spotLight.target.position.set(0, 10, 0);
+scene.add(spotLight);
+scene.add(spotLight.target);
 
 /* ============================================================================
  *  트리 & 레이어 셰이딩
@@ -380,19 +404,17 @@ const treeHeight = 9;
 const treeRadius = 3.6;
 const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-// DOF용 포커스 타깃 (트리 중심 근처, 나중에 사용 가능)
-const dofTarget = new THREE.Vector3(0, TREE_CENTER_Y, 0);
-
-// dummy 위치용
+// dummy 위치용 트리 중심
 const tree = new THREE.Object3D();
 tree.position.y = TREE_CENTER_Y;
 treeGroup.add(tree);
 
+// 별 pivot
 const star = new THREE.Object3D();
 star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
 
-// 🔧 트리 레이어별 머티리얼 (여기만 만지면 전체 레이어 질감 바뀜)
+// 🔧 트리 레이어별 머티리얼 (여기만 만지면 질감/메탈/러프 조절 가능)
 const treeLayerMaterials = {
   star: new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -417,8 +439,7 @@ const treeLayerMaterials = {
     roughness: 0.4,
   }),
 };
-
-// 콘솔에서 만질 수 있게 노출
+// 콘솔에서 직접 tweek용
 window.treeLayerMaterials = treeLayerMaterials;
 
 const loader = new GLTFLoader();
@@ -432,22 +453,17 @@ loader.load(
     treeModel.scale.set(0.7, 0.7, 0.7);
     treeGroup.add(treeModel);
 
-    // 레이어 이름(01~08)에 따라 색 + 머티리얼 적용
+    // 레이어 이름(01~08)에 따라 버텍스 컬러 + 머티리얼 적용
     applyLayerShading(treeModel);
 
-        // 레이어 이름(01~08)에 따라 색 입히기
-    applyLayerShading(treeModel);
-
-    // 🌈 트리 표면에 전구 박기
+    // 🌈 트리 표면에 전구 박기 (고정 위치)
     createTreeBulbs();
-
   },
   undefined,
   (error) => {
     console.error("트리 모델 로드 실패:", error);
   }
 );
-
 
 // 부모 체인까지 올라가며 "01" ~ "08" 레이어 이름 찾기
 function getLayerIdFromHierarchy(obj) {
@@ -463,7 +479,6 @@ function getLayerIdFromHierarchy(obj) {
 
 // 트리 레이어 셰이딩 + 레이어별 머티리얼 적용
 function applyLayerShading(root) {
-  // y 그라디언트용 컬러
   const greenTop    = new THREE.Color(0x003937);
   const greenBottom = new THREE.Color(0x3fac00);
 
@@ -478,14 +493,13 @@ function applyLayerShading(root) {
     const layerId = getLayerIdFromHierarchy(obj);
     if (!layerId) return;
 
-    // 1) 지오메트리 복제 + non-indexed로 변경
+    // 지오메트리 복제 + non-indexed
     let geo = obj.geometry.clone();
     geo = geo.toNonIndexed();
 
     const pos = geo.attributes.position;
     const vertexCount = pos.count;
 
-    // y 범위
     let minY = Infinity;
     let maxY = -Infinity;
     for (let i = 0; i < vertexCount; i++) {
@@ -495,25 +509,22 @@ function applyLayerShading(root) {
     }
     const height = maxY - minY || 1;
 
-    // 2) 버텍스 컬러 그라디언트 계산
     const colors = new Float32Array(vertexCount * 3);
     const color = new THREE.Color();
 
     for (let i = 0; i < vertexCount; i++) {
       const y = pos.getY(i);
-      const tBottom = (y - minY) / height; // bottom(0) ~ top(1)
+      const tBottom = (y - minY) / height;
 
       if (layerId === "01") {
-        // 별
         color.copy(starColor);
       } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
-        // 02~07: 나뭇잎 (아래 밝은 초록 → 위 어두운 초록)
+        // 잎: 아래 밝은 초록 → 위 어두운 초록
         color.copy(greenBottom).lerp(greenTop, tBottom);
       } else if (layerId === "08") {
-        // 08: 나무 기둥 (아래 어두운 갈색 → 위 밝은 갈색)
+        // 기둥: 아래 어두운 갈색 → 위 밝은 갈색
         color.copy(brownBottom).lerp(brownTop, tBottom);
       } else {
-        // 기타
         color.set(0xffffff);
       }
 
@@ -525,7 +536,7 @@ function applyLayerShading(root) {
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     obj.geometry = geo;
 
-    // 3) 레이어 타입에 따라 머티리얼 선택
+    // 레이어 타입별 머티리얼 선택
     let matKey = "other";
     if (layerId === "01") {
       matKey = "star";
@@ -537,13 +548,15 @@ function applyLayerShading(root) {
 
     const mat = treeLayerMaterials[matKey];
 
-    // 만약 원래 머티리얼이 투명 설정이라면 그 값은 존중
+    // 기존 머티리얼이 투명 설정이면 유지
     if (obj.material && obj.material.transparent) {
       mat.transparent = true;
       mat.opacity = obj.material.opacity;
     }
 
     obj.material = mat;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
   });
 }
 
@@ -632,7 +645,6 @@ for (let i = 0; i < snowCount; i++) {
 snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
 
 const snowTexture = createSnowParticleTexture();
-
 const snowMat = new THREE.PointsMaterial({
   map: snowTexture,
   color: 0xffffff,
@@ -642,12 +654,11 @@ const snowMat = new THREE.PointsMaterial({
   blending: THREE.NormalBlending,
   sizeAttenuation: true,
 });
-
 const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
 /* ============================================================================
- *  트리에 이미지(소원 카드) 추가
+ *  트리에 이미지(소원 카드) 추가 - 피봇 + 관성 스윙
  * ==========================================================================*/
 
 function getRandomPositionOnTree() {
@@ -683,15 +694,47 @@ function addImageToTree(docId, data) {
       });
       const plane = new THREE.Mesh(geo, mat);
 
-      const position = getRandomPositionOnTree();
-      plane.position.copy(position);
-      plane.lookAt(new THREE.Vector3(0, position.y, 0));
-      plane.rotateY(Math.PI);
+      // 🌲 카드가 놓일 트리 표면 위치
+      const pos = getRandomPositionOnTree();
 
-      treeGroup.add(plane);
+      // 1) 피봇용 hanger (가지에 박힌 지점)
+      const hanger = new THREE.Object3D();
+      hanger.position.copy(pos);
+      treeGroup.add(hanger);
 
+      // 2) 카드는 hanger 기준으로 아래로 매달기
+      const hangLength = height * 0.5;
+      plane.position.set(0, -hangLength, 0);
+      hanger.add(plane);
+
+      // 3) 월드 기준으로 카드 방향 정리 (트리 중심을 향하도록 세로로 세워줌)
+      const worldPos = new THREE.Vector3();
+      plane.getWorldPosition(worldPos);
+
+      // y는 그대로, xz만 중심(0,0)을 향하게 → yaw만 회전, 카드가 눕지 않음
+      const lookTarget = new THREE.Vector3(0, worldPos.y, 0);
+      plane.lookAt(lookTarget);
+      plane.rotateY(Math.PI); // 바깥쪽을 향하게 뒤집기
+
+      // 클릭용 메쉬 등록
       imageMeshes.push(plane);
       meshToData.set(plane, { ...data, id: docId });
+
+      // 트리 중심으로부터의 방향 (반경 방향)
+      const radial = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+      // ✅ 변경 (좌우 느낌)
+      const swingAxis = radial.clone();   // 축 = 트리 중심에서 뻗어나가는 방향
+
+      // 🌊 이 카드에 대한 스윙 상태 등록 (축 포함)
+      hangingObjects.push({
+        hanger,
+        axis: swingAxis,   // 카드가 둘레 방향으로 좌우 흔들리는 축
+        angle: 10,
+        vel: 10,
+        stiffness: 1,
+        damping: 1.0,
+      });
+
     },
     undefined,
     (err) => console.error("텍스처 로드 오류", err)
@@ -699,23 +742,21 @@ function addImageToTree(docId, data) {
 }
 
 /* ============================================================================
- *  트리 표면 전구 (고정된 빛)
+ *  트리 표면 전구 (고정 위치 + 깜빡임만)
  * ==========================================================================*/
 
-const TREE_BULB_COUNT = 80;      // 전구 개수 (원하면 40~120 사이로 조절)
+const TREE_BULB_COUNT = 80;
 const treeBulbs = [];
 
 function createTreeBulbs() {
   for (let i = 0; i < TREE_BULB_COUNT; i++) {
-    // 색상 랜덤 (HSL)
     const hue = Math.random();
     const color = new THREE.Color();
     color.setHSL(hue, 1, 0.6);
 
-    // 🔆 glowTexture를 사용하는 스프라이트 전구
     const mat = new THREE.SpriteMaterial({
       map: glowTexture,
-      color: color,
+      color,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -724,30 +765,26 @@ function createTreeBulbs() {
 
     const sprite = new THREE.Sprite(mat);
 
-    // 트리 표면 위의 위치: 기존 카드 배치 함수 재활용
+    // 트리 표면 위치
     const pos = getRandomPositionOnTree();
-
-    // 트리 중심에서 바깥 방향으로 약간 밀어줘서 가지 밖으로 살짝 튀어나오게
     const dirFromCenter = new THREE.Vector3(pos.x, 0, pos.z).normalize();
-    pos.x += dirFromCenter.x * -0.1;   // 0.1 ~ 0.25 사이로 조절
-    pos.z += dirFromCenter.z * -0.1;
+    pos.x += dirFromCenter.x * 0.1;
+    pos.z += dirFromCenter.z * 0.1;
 
     sprite.position.copy(pos);
 
-    // 전구 크기
-    const scale = 0.4 + Math.random() * 2; // 0.4~0.6 정도
+    const scale = 0.35 + Math.random() * 0.15;
     sprite.scale.set(scale, scale, 1);
 
     treeGroup.add(sprite);
+
     treeBulbs.push({
       sprite,
-      baseColor: color.clone(),
       flickerOffset: Math.random() * Math.PI * 2,
     });
+    // ⚠️ 전구는 관성 스윙 없음 (hangingObjects에 넣지 않음)
   }
 }
-
-
 
 /* ============================================================================
  *  Firestore 실시간 구독
@@ -1027,7 +1064,7 @@ let mouseX = 0;
 let mouseY = 0;
 
 let baseRotationY = 0;
-let spinVelocityY = 0; // 관성
+let spinVelocityY = 0; // 관성 회전량
 
 renderer.domElement.addEventListener("mousedown", (event) => {
   isDragging = true;
@@ -1040,7 +1077,7 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  // 월드 패럴럭스는 드래그 중에도 유지
+  // 패럴럭스는 항상 업데이트
   mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
@@ -1051,9 +1088,16 @@ window.addEventListener("mousemove", (event) => {
 
   const deltaRot = deltaX * dragRotateSpeed;
 
+  // 트리 자체 회전
   treeGroup.rotation.y += deltaRot;
   baseRotationY = treeGroup.rotation.y;
   spinVelocityY = deltaRot;
+
+  // 🎯 드래그 시 카드들에만 관성 임펄스 주기
+  const impulse = deltaRot * 6.0;   // 세기 조절: 4~10 정도에서 취향대로
+  for (const ho of hangingObjects) {
+    ho.vel += impulse;
+  }
 });
 
 renderer.domElement.addEventListener(
@@ -1113,7 +1157,7 @@ function animate(time) {
   }
 
   // 카메라 패럴럭스
-  const baseCamY = 8;
+  const baseCamY = 6;
   const targetCamX = mouseX * -12;
   const targetCamY = baseCamY + mouseY * 6;
 
@@ -1144,17 +1188,26 @@ function animate(time) {
     glow.position.copy(light.position);
   }
 
+  // 🌊 가지에 매달린 카드 스윙
+  for (const ho of hangingObjects) {
+    const { stiffness, damping } = ho;
+
+    ho.vel += (-stiffness * ho.angle) * delta;
+    ho.vel -= ho.vel * damping * delta;
+    ho.angle += ho.vel * delta;
+
+    // 축을 기준으로 회전 적용
+    ho.hanger.quaternion.setFromAxisAngle(ho.axis, ho.angle);
+  }
+
+
   // 🌟 트리 표면 전구 깜빡임
   for (let i = 0; i < treeBulbs.length; i++) {
     const bulb = treeBulbs[i];
     const sprite = bulb.sprite;
-
-    // 살짝 숨쉬듯이 밝기 변화
-    const pulse =
-      0.5 + 0.5 * Math.sin(t * 10.0 + bulb.flickerOffset); // 속도/강도 조절 가능
+    const pulse = 0.5 + 0.5 * Math.sin(t * 10.0 + bulb.flickerOffset);
     sprite.material.opacity = pulse;
   }
-
 
   // 눈 떨어지는 애니메이션
   const pos = snowGeo.attributes.position;
