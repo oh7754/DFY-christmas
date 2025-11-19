@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-// ★ postprocessing (Bloom → ❌, DOF용 BokehPass만 사용)
+// ★ postprocessing: DOF용 BokehPass만 사용 (Bloom X)
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
@@ -245,7 +245,7 @@ wishModal.addEventListener("click", (e) => {
 });
 
 /* ============================================================================
- *  캔버스 텍스처 (글로우 / 바닥 라이트 오버레이)
+ *  캔버스 텍스처 (글로우 / 눈 입자)
  * ==========================================================================*/
 
 // 🔆 라이트 글로우용 캔버스 텍스처
@@ -277,22 +277,17 @@ function createGlowTexture() {
 
 const glowTexture = createGlowTexture();
 
-// 바닥 라이트 오버레이용 텍스처 (중앙 밝음 → 바깥 투명)
-function createGroundLightOverlayTexture(size = 512) {
+// ❄️ 눈 입자용 동그라미 텍스처
+function createSnowParticleTexture(size = 64) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
 
-  const grd = ctx.createRadialGradient(
-    size / 2,
-    size / 2,
-    0,
-    size / 2,
-    size / 2,
-    size / 2
-  );
-  grd.addColorStop(0.0, "rgba(255,255,255,0.6)");
-  grd.addColorStop(0.4, "rgba(255,255,255,0.25)");
+  const r = size / 2;
+
+  const grd = ctx.createRadialGradient(r, r, 0, r, r, r);
+  grd.addColorStop(0.0, "rgba(255,255,255,1)");
+  grd.addColorStop(0.3, "rgba(255,255,255,0.9)");
   grd.addColorStop(1.0, "rgba(255,255,255,0)");
 
   ctx.fillStyle = grd;
@@ -300,8 +295,6 @@ function createGroundLightOverlayTexture(size = 512) {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return tex;
 }
@@ -322,26 +315,25 @@ camera.position.set(0, 6, 18);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
-  alpha: true, // body 배경색 보이게
+  alpha: true, // body 배경색과 섞이게
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.setClearColor(0x000000, 0); // 완전 투명 (body 단색 배경 사용)
+renderer.setClearColor(0x000110); // 어두운 단색 배경
 document.body.appendChild(renderer.domElement);
 
-// ==== DOF용 포스트프로세싱 컴포저 (Bloom 없음) ====
+// ==== DOF용 포스트프로세싱 컴포저 (현재는 값 0이라 효과 없음) ====
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-// BokehPass 파라미터 (나중에 튜닝용)
 const bokehParams = {
-  focus: 20.0,              // 카메라로부터 초점 거리 (대략 트리 중심 거리 근처)
-  aperture: 0.0002,         // 조리개 (값이 작을수록 심도 깊고, 클수록 심도 얕음)
-  maxblur: 0.01,            // 최대 블러 강도
+  focus: 0.0,               // 나중에 다시 쓸 예정
+  aperture: 0.0,
+  maxblur: 0.0,
   width: window.innerWidth,
   height: window.innerHeight,
 };
@@ -353,53 +345,26 @@ composer.addPass(bokehPass);
 const treeGroup = new THREE.Group();
 scene.add(treeGroup);
 
-
 /* ============================================================================
- *  바닥: 기본 컬러 + 그 위에 원형 라이트 디스크
+ *  바닥: 단색 원형 메쉬
  * ==========================================================================*/
 
-// 1) 기본 바닥(이미 있는 ground) 유지
 const groundGeo = new THREE.CircleGeometry(18, 64);
 const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x050816, // 바닥 기본 색
+  color: 0x000110, // 바닥 기본 색 (배경이랑 톤 맞게)
   metalness: 0.2,
   roughness: 0.9,
-  transparent: true,
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 scene.add(ground);
 
-// 2) glowTexture를 그대로 바닥용 디스크로 사용
-function createGroundGlowDisk(radius = 12, segments = 64) {
-  const geo = new THREE.CircleGeometry(radius, segments);
-
-  const mat = new THREE.MeshBasicMaterial({
-    map: glowTexture,                // 🔴 위에서 만든 glowTexture 그대로 사용
-    color: 0x000000,                // 필요하면 살짝 색 틴트 가능 (예: 0x9afcff)
-    transparent: true,
-    depthWrite: true,              // z-buffer 안 남기기 (오버레이 느낌)
-    blending: THREE.AdditiveBlending, // 빛이 번지는 느낌
-  });
-
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = 0.01;          // 바닥보다 살짝 위로 띄워서 z-fighting 방지
-  return mesh;
-}
-
-const groundGlow = createGroundGlowDisk(24, 64);
-scene.add(groundGlow);
-
-
-
-
 /* ============================================================================
  *  조명
  * ==========================================================================*/
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.8);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 1);
 hemiLight.position.set(0, 1, 0);
 scene.add(hemiLight);
 
@@ -415,7 +380,7 @@ const treeHeight = 9;
 const treeRadius = 3.6;
 const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-// DOF용 포커스 타깃 (트리 중심 근처)
+// DOF용 포커스 타깃 (트리 중심 근처, 나중에 사용 가능)
 const dofTarget = new THREE.Vector3(0, TREE_CENTER_Y, 0);
 
 // dummy 위치용
@@ -426,6 +391,35 @@ treeGroup.add(tree);
 const star = new THREE.Object3D();
 star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
+
+// 🔧 트리 레이어별 머티리얼 (여기만 만지면 전체 레이어 질감 바뀜)
+const treeLayerMaterials = {
+  star: new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 1,
+    roughness: 0.4,
+    emissive: 0xffb60c,
+    emissiveIntensity: 0.4,
+  }),
+  foliage: new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.2,
+    roughness: 0.5,
+  }),
+  trunk: new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.4,
+    roughness: 0.7,
+  }),
+  other: new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.3,
+    roughness: 0.4,
+  }),
+};
+
+// 콘솔에서 만질 수 있게 노출
+window.treeLayerMaterials = treeLayerMaterials;
 
 const loader = new GLTFLoader();
 let treeModel = null;
@@ -438,14 +432,22 @@ loader.load(
     treeModel.scale.set(0.7, 0.7, 0.7);
     treeGroup.add(treeModel);
 
-    // 레이어 이름(01~08)에 따라 색 입히기
+    // 레이어 이름(01~08)에 따라 색 + 머티리얼 적용
     applyLayerShading(treeModel);
+
+        // 레이어 이름(01~08)에 따라 색 입히기
+    applyLayerShading(treeModel);
+
+    // 🌈 트리 표면에 전구 박기
+    createTreeBulbs();
+
   },
   undefined,
   (error) => {
     console.error("트리 모델 로드 실패:", error);
   }
 );
+
 
 // 부모 체인까지 올라가며 "01" ~ "08" 레이어 이름 찾기
 function getLayerIdFromHierarchy(obj) {
@@ -459,15 +461,16 @@ function getLayerIdFromHierarchy(obj) {
   return null;
 }
 
-// 트리 레이어 셰이딩
+// 트리 레이어 셰이딩 + 레이어별 머티리얼 적용
 function applyLayerShading(root) {
-  const greenTop    = new THREE.Color(0x003937); // 위쪽(어두운 초록)
-  const greenBottom = new THREE.Color(0x3fac00); // 아래쪽(밝은 초록)
+  // y 그라디언트용 컬러
+  const greenTop    = new THREE.Color(0x003937);
+  const greenBottom = new THREE.Color(0x3fac00);
 
-  const brownTop    = new THREE.Color(0x5f4000); // 위쪽(밝은 갈색)
-  const brownBottom = new THREE.Color(0x2b0800); // 아래쪽(어두운 갈색)
+  const brownTop    = new THREE.Color(0x5f4000);
+  const brownBottom = new THREE.Color(0x2b0800);
 
-  const starColor   = new THREE.Color(0xffb60c); // 01: 별 색
+  const starColor   = new THREE.Color(0xffb60c);
 
   root.traverse((obj) => {
     if (!obj.isMesh || !obj.geometry) return;
@@ -475,12 +478,14 @@ function applyLayerShading(root) {
     const layerId = getLayerIdFromHierarchy(obj);
     if (!layerId) return;
 
+    // 1) 지오메트리 복제 + non-indexed로 변경
     let geo = obj.geometry.clone();
     geo = geo.toNonIndexed();
 
     const pos = geo.attributes.position;
     const vertexCount = pos.count;
 
+    // y 범위
     let minY = Infinity;
     let maxY = -Infinity;
     for (let i = 0; i < vertexCount; i++) {
@@ -490,6 +495,7 @@ function applyLayerShading(root) {
     }
     const height = maxY - minY || 1;
 
+    // 2) 버텍스 컬러 그라디언트 계산
     const colors = new Float32Array(vertexCount * 3);
     const color = new THREE.Color();
 
@@ -498,14 +504,16 @@ function applyLayerShading(root) {
       const tBottom = (y - minY) / height; // bottom(0) ~ top(1)
 
       if (layerId === "01") {
+        // 별
         color.copy(starColor);
       } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
-        // 02~07: 아래 밝은 초록 → 위 어두운 초록
+        // 02~07: 나뭇잎 (아래 밝은 초록 → 위 어두운 초록)
         color.copy(greenBottom).lerp(greenTop, tBottom);
       } else if (layerId === "08") {
-        // 08: 아래 어두운 갈색 → 위 밝은 갈색
+        // 08: 나무 기둥 (아래 어두운 갈색 → 위 밝은 갈색)
         color.copy(brownBottom).lerp(brownTop, tBottom);
       } else {
+        // 기타
         color.set(0xffffff);
       }
 
@@ -517,12 +525,19 @@ function applyLayerShading(root) {
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     obj.geometry = geo;
 
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      metalness: 0.4,
-      roughness: 0.8,
-    });
+    // 3) 레이어 타입에 따라 머티리얼 선택
+    let matKey = "other";
+    if (layerId === "01") {
+      matKey = "star";
+    } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
+      matKey = "foliage";
+    } else if (layerId === "08") {
+      matKey = "trunk";
+    }
 
+    const mat = treeLayerMaterials[matKey];
+
+    // 만약 원래 머티리얼이 투명 설정이라면 그 값은 존중
     if (obj.material && obj.material.transparent) {
       mat.transparent = true;
       mat.opacity = obj.material.opacity;
@@ -606,7 +621,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
  *  눈 파티클
  * ==========================================================================*/
 
-const snowCount = 600;
+const snowCount = 800;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
 for (let i = 0; i < snowCount; i++) {
@@ -615,7 +630,19 @@ for (let i = 0; i < snowCount; i++) {
   snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
 }
 snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
-const snowMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.06 });
+
+const snowTexture = createSnowParticleTexture();
+
+const snowMat = new THREE.PointsMaterial({
+  map: snowTexture,
+  color: 0xffffff,
+  size: 0.14,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.NormalBlending,
+  sizeAttenuation: true,
+});
+
 const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
@@ -670,6 +697,57 @@ function addImageToTree(docId, data) {
     (err) => console.error("텍스처 로드 오류", err)
   );
 }
+
+/* ============================================================================
+ *  트리 표면 전구 (고정된 빛)
+ * ==========================================================================*/
+
+const TREE_BULB_COUNT = 80;      // 전구 개수 (원하면 40~120 사이로 조절)
+const treeBulbs = [];
+
+function createTreeBulbs() {
+  for (let i = 0; i < TREE_BULB_COUNT; i++) {
+    // 색상 랜덤 (HSL)
+    const hue = Math.random();
+    const color = new THREE.Color();
+    color.setHSL(hue, 1, 0.6);
+
+    // 🔆 glowTexture를 사용하는 스프라이트 전구
+    const mat = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: color,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: true,
+    });
+
+    const sprite = new THREE.Sprite(mat);
+
+    // 트리 표면 위의 위치: 기존 카드 배치 함수 재활용
+    const pos = getRandomPositionOnTree();
+
+    // 트리 중심에서 바깥 방향으로 약간 밀어줘서 가지 밖으로 살짝 튀어나오게
+    const dirFromCenter = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+    pos.x += dirFromCenter.x * -0.1;   // 0.1 ~ 0.25 사이로 조절
+    pos.z += dirFromCenter.z * -0.1;
+
+    sprite.position.copy(pos);
+
+    // 전구 크기
+    const scale = 0.4 + Math.random() * 2; // 0.4~0.6 정도
+    sprite.scale.set(scale, scale, 1);
+
+    treeGroup.add(sprite);
+    treeBulbs.push({
+      sprite,
+      baseColor: color.clone(),
+      flickerOffset: Math.random() * Math.PI * 2,
+    });
+  }
+}
+
+
 
 /* ============================================================================
  *  Firestore 실시간 구독
@@ -1006,16 +1084,12 @@ window.addEventListener("resize", () => {
 
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
-
-  // 🔁 BokehPass도 새 사이즈로 갱신
   bokehPass.setSize(window.innerWidth, window.innerHeight);
 });
-
 
 /* ============================================================================
  *  애니메이션 루프
  * ==========================================================================*/
-/* ========= 애니메이션 루프 ========= */
 
 let lastTime = 0;
 
@@ -1039,8 +1113,8 @@ function animate(time) {
   }
 
   // 카메라 패럴럭스
-  const baseCamY = 6;
-  const targetCamX = mouseX * 12;
+  const baseCamY = 8;
+  const targetCamX = mouseX * -12;
   const targetCamY = baseCamY + mouseY * 6;
 
   camera.position.x += (targetCamX - camera.position.x) * 0.05;
@@ -1070,6 +1144,18 @@ function animate(time) {
     glow.position.copy(light.position);
   }
 
+  // 🌟 트리 표면 전구 깜빡임
+  for (let i = 0; i < treeBulbs.length; i++) {
+    const bulb = treeBulbs[i];
+    const sprite = bulb.sprite;
+
+    // 살짝 숨쉬듯이 밝기 변화
+    const pulse =
+      0.5 + 0.5 * Math.sin(t * 10.0 + bulb.flickerOffset); // 속도/강도 조절 가능
+    sprite.material.opacity = pulse;
+  }
+
+
   // 눈 떨어지는 애니메이션
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
@@ -1082,15 +1168,11 @@ function animate(time) {
   }
   pos.needsUpdate = true;
 
-  // 🔍 DOF 포커스 업데이트 (dofTarget = 트리 중심 벡터)
-  bokehPass.uniforms.focus.value = camera.position.distanceTo(dofTarget);
-
   camera.lookAt(0, tree.position.y, 0);
-  composer.render();   // renderer.render(X)
+  composer.render();
 }
 
 animate(0);
-
 
 /* ============================================================================
  *  scene export
