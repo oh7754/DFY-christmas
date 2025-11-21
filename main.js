@@ -1085,14 +1085,16 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  if (!isDragging) {
-    // 마우스 위치를 패럴럭스로 사용
-    mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-    mouseY = (event.clientY / window.innerHeight) * 2 - 1;
-    return;
+  // ✅ 드래그 여부와 상관없이 항상 패럴럭스용 마우스 좌표 업데이트
+  mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+  mouseY = (event.clientY / window.innerHeight) * 2 - 1;
+
+  // 드래그 중일 때만 트리 회전 로직 실행
+  if (isDragging) {
+    moveDrag(event.clientX);
   }
-  moveDrag(event.clientX);
 });
+
 
 // ======================
 //  모바일: 터치
@@ -1134,19 +1136,19 @@ window.addEventListener(
 
 // 🔧 자이로 감도 파라미터
 //  - sensitivityX, sensitivityY: 작을수록 더 민감, 클수록 둔해짐
-const GYRO_SENSITIVITY_X = 10; // gamma (좌/우)
-const GYRO_SENSITIVITY_Y = 10; // beta (앞/뒤)
+const GYRO_SENSITIVITY_X = 30; // gamma (좌/우)
+const GYRO_SENSITIVITY_Y = 30; // beta (앞/뒤)
 
 function handleOrientation(event) {
-  const { beta, gamma } = event; // beta: 앞/뒤, gamma: 좌/우
+  const { beta, gamma } = event;
   if (beta == null || gamma == null) return;
 
-  // -90~90 / -180~180 정도 들어오는 값을 -1~1 로 정규화
-  const nx = THREE.MathUtils.clamp(gamma / GYRO_SENSITIVITY_X, -1, 1);
-  const ny = THREE.MathUtils.clamp(beta / GYRO_SENSITIVITY_Y, -1, 1);
+  const nx = THREE.MathUtils.clamp(gamma / 40, -1, 1); // 좌우
+  const ny = THREE.MathUtils.clamp(beta / 40, -1, 1);  // 앞뒤
 
-  gyroX = nx;
-  gyroY = ny;
+  // 🔁 여기서 자이로 값을 통째로 반전
+  gyroX = -nx;
+  gyroY = -ny;
 }
 
 function setupGyro() {
