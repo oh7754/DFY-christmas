@@ -319,7 +319,7 @@ camera.position.set(0, 6, 18);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
-  alpha: true, // body 배경과 섞이게
+  alpha: true,
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -328,10 +328,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.setClearColor(0x000110); // 어두운 단색 배경
+renderer.setClearColor(0x000110);
 document.body.appendChild(renderer.domElement);
 
-// 🔧 포스트프로세싱 (지금은 DOF 파라미터 0이라 효과 없음, 나중에 쓸 수 있음)
+// 🔧 포스트프로세싱
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
@@ -351,7 +351,7 @@ const treeGroup = new THREE.Group();
 scene.add(treeGroup);
 
 /* ============================================================================
- *  바닥: 단색 원형 메쉬
+ *  바닥
  * ==========================================================================*/
 
 const groundGeo = new THREE.CircleGeometry(18, 64);
@@ -370,12 +370,10 @@ scene.add(ground);
  *  조명
  * ==========================================================================*/
 
-// 상하 방향 전체 라이트
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.4);
 hemiLight.position.set(0, 1, 0);
 scene.add(hemiLight);
 
-// 🔦 메인 스포트라이트 (위에서 트리 비추는 느낌)
 const spotLight = new THREE.SpotLight(
   0xffffff,
   4.0,
@@ -390,7 +388,6 @@ spotLight.shadow.camera.near = 5;
 spotLight.shadow.camera.far = 60;
 spotLight.shadow.bias = -0.0001;
 spotLight.shadow.normalBias = 0.01;
-
 spotLight.position.set(0, 20, 0);
 spotLight.target.position.set(0, 10, 0);
 scene.add(spotLight);
@@ -404,17 +401,14 @@ const treeHeight = 9;
 const treeRadius = 3.6;
 const TREE_CENTER_Y = 0.75 + treeHeight / 2;
 
-// dummy 위치용 트리 중심
 const tree = new THREE.Object3D();
 tree.position.y = TREE_CENTER_Y;
 treeGroup.add(tree);
 
-// 별 pivot
 const star = new THREE.Object3D();
 star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
 
-// 🔧 트리 레이어별 머티리얼
 const treeLayerMaterials = {
   star: new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -461,7 +455,6 @@ loader.load(
   }
 );
 
-// 부모 체인까지 올라가며 "01" ~ "08" 레이어 이름 찾기
 function getLayerIdFromHierarchy(obj) {
   let node = obj;
   while (node) {
@@ -473,7 +466,6 @@ function getLayerIdFromHierarchy(obj) {
   return null;
 }
 
-// 트리 레이어 셰이딩 + 레이어별 머티리얼 적용
 function applyLayerShading(root) {
   const greenTop = new THREE.Color(0x003937);
   const greenBottom = new THREE.Color(0x3fac00);
@@ -649,7 +641,7 @@ const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
 /* ============================================================================
- *  트리에 이미지(소원 카드) 추가 - 중력 펜듈럼 버전
+ *  트리에 이미지(소원 카드) 추가 - 중력 펜듈럼
  * ==========================================================================*/
 
 function getRandomPositionOnTree() {
@@ -668,14 +660,10 @@ function getRandomPositionOnTree() {
 }
 
 function addImageToTree(docId, data) {
-  console.log("addImageToTree 호출:", docId, data.url);  // 🔍
-
   const texLoader = new THREE.TextureLoader();
   texLoader.load(
     data.url,
     (texture) => {
-      console.log("텍스처 로드 완료:", data.url);       // 🔍
-
       const aspect = texture.image.width / texture.image.height;
       const baseHeight = 1.0;
       const width = baseHeight * aspect;
@@ -689,52 +677,36 @@ function addImageToTree(docId, data) {
       });
       const plane = new THREE.Mesh(geo, mat);
 
-      // 🌲 카드가 놓일 트리 표면 위치
       const pos = getRandomPositionOnTree();
 
-      // 1) 피봇용 hanger (가지에 박힌 지점)
       const hanger = new THREE.Object3D();
       hanger.position.copy(pos);
       treeGroup.add(hanger);
 
-      // 2) 카드는 hanger 기준으로 아래로 매달기
       const hangLength = height * 0.5;
       plane.position.set(0, -hangLength, 0);
       hanger.add(plane);
 
-      // 3) 월드 기준으로 카드 방향 정리 (트리 중심을 향하도록)
       const worldPos = new THREE.Vector3();
       plane.getWorldPosition(worldPos);
 
       const lookTarget = new THREE.Vector3(0, worldPos.y, 0);
       plane.lookAt(lookTarget);
-      plane.rotateY(Math.PI); // 바깥쪽을 향하게 뒤집기
+      plane.rotateY(Math.PI);
 
-      // 🔍 클릭용 메쉬 등록
       imageMeshes.push(plane);
       meshToData.set(plane, { ...data, id: docId });
 
-      // =======================
-      //   🔁 스윙 물리 설정
-      // =======================
-
-      // 트리 중심에서 카드까지의 수평 방향 (가지 방향)
       const radial = new THREE.Vector3(pos.x, 0, pos.z).normalize();
-
-      // 👉 좌우 스윙용 축:
-      //    축을 "트리 중심 ↔ 카드" 방향(radial)으로 잡으면
-      //    스윙 평면이 (tangent + gravity)가 되면서
-      //    화면에서 볼 때 앞뒤 대신 좌우로 흔들리는 느낌이 남
       const swingAxis = radial.clone().normalize();
 
-      // 이 카드에 대한 스윙 상태 등록
       hangingObjects.push({
         hanger,
-        axis: swingAxis, // 카드마다 다르게, 트리 방향에 맞춰진 축
-        angle: 0,        // 현재 각도
-        vel: 0,          // 각속도
-        stiffness: 40,  // 복원력 (스프링 느낌)
-        damping: 5,    // 감쇠(마찰)
+        axis: swingAxis,
+        angle: 0,
+        vel: 0,
+        stiffness: 40,
+        damping: 5,
       });
     },
     undefined,
@@ -742,9 +714,8 @@ function addImageToTree(docId, data) {
   );
 }
 
-
 /* ============================================================================
- *  트리 표면 전구 (고정 위치 + 깜빡임만)
+ *  트리 표면 전구
  * ==========================================================================*/
 
 const TREE_BULB_COUNT = 80;
@@ -1059,32 +1030,23 @@ let isDragging = false;
 let prevX = 0;
 const dragRotateSpeed = 0.005;
 
-// 패럴럭스용 -1 ~ 1
 let mouseX = 0;
 let mouseY = 0;
 
-// 트리 회전 관성
+let gyroX = 0;
+let gyroY = 0;
+let useGyro = false; // 실제로 자이로 값을 쓸지 여부
+
 let baseRotationY = 0;
 let spinVelocityY = 0;
 
-// 간단 모바일 판별
 const isMobile =
   "ontouchstart" in window ||
   (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
 
-// iOS Safari 같은 환경에서는 requestPermission 필요
 const needsGyroPermission =
-  typeof DeviceOrientationEvent !== "undefined" &&
-  typeof DeviceOrientationEvent.requestPermission === "function";
-
-// 모바일 + 자이로 상태
-let useGyro = !needsGyroPermission; 
-// 👉 permission이 필요 없는 경우(안드/일반 브라우저)는 바로 true로 시작
-
-
-/* ============================================================================
- *  드래그 회전 / 줌 / 리사이즈
- * ==========================================================================*/
+  typeof window.DeviceOrientationEvent !== "undefined" &&
+  typeof window.DeviceOrientationEvent.requestPermission === "function";
 
 // 공용 드래그 시작
 function beginDrag(clientX) {
@@ -1100,21 +1062,17 @@ function moveDrag(clientX) {
 
   const deltaRot = deltaX * dragRotateSpeed;
 
-  // 트리 회전
   treeGroup.rotation.y += deltaRot;
   baseRotationY = treeGroup.rotation.y;
   spinVelocityY = deltaRot;
 
-  // 카드 관성
   const impulse = deltaRot * 8.0;
   for (const ho of hangingObjects) {
     ho.vel += impulse;
   }
 }
 
-// ======================
-//  데스크탑: 마우스
-// ======================
+// 데스크탑 마우스
 renderer.domElement.addEventListener("mousedown", (event) => {
   beginDrag(event.clientX);
 });
@@ -1125,7 +1083,6 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (event) => {
   if (!isDragging) {
-    // 데스크탑에서는 마우스 위치를 그대로 패럴럭스로 사용
     mouseX = (event.clientX / window.innerWidth) * 2 - 1;
     mouseY = (event.clientY / window.innerHeight) * 2 - 1;
     return;
@@ -1133,9 +1090,7 @@ window.addEventListener("mousemove", (event) => {
   moveDrag(event.clientX);
 });
 
-// ======================
-//  모바일: 터치
-// ======================
+// 모바일 터치
 renderer.domElement.addEventListener(
   "touchstart",
   (event) => {
@@ -1143,27 +1098,9 @@ renderer.domElement.addEventListener(
     const touch = event.touches[0];
     if (!touch) return;
     beginDrag(touch.clientX);
-
-    // 🔐 iOS 사파리에서만 permission 요청
-    if (needsGyroPermission && !useGyro) {
-      DeviceOrientationEvent.requestPermission()
-        .then((resp) => {
-          console.log("DeviceOrientation permission:", resp);
-          if (resp === "granted") {
-            useGyro = true;
-            console.log("✅ Gyro enabled");
-          } else {
-            console.log("❌ Gyro denied:", resp);
-          }
-        })
-        .catch((err) => {
-          console.warn("Gyro permission error", err);
-        });
-    }
   },
   { passive: true }
 );
-
 
 window.addEventListener(
   "touchmove",
@@ -1171,8 +1108,6 @@ window.addEventListener(
     if (!isMobile || !isDragging) return;
     const touch = event.touches[0];
     if (!touch) return;
-
-    // 터치 드래그로 트리 회전
     moveDrag(touch.clientX);
   },
   { passive: true }
@@ -1188,35 +1123,121 @@ window.addEventListener(
 );
 
 /* ============================================================================
- *  모바일 자이로 → 패럴럭스 입력
+ *  자이로(기울기 센서) 세팅
  * ==========================================================================*/
 
-// 자이로 이벤트 리스너 (iOS / 안드로이드 공통)
-if (window.DeviceOrientationEvent) {
-  window.addEventListener("deviceorientation", (event) => {
-    if (!isMobile) return;
-    // iOS에서는 permission 필요 / 그 외에서는 바로 사용
-    if (needsGyroPermission && !useGyro) return;
+function handleOrientation(event) {
+  const { beta, gamma } = event;
+  if (beta == null || gamma == null) return;
 
-    // 🔍 디버그용 로그 (모바일 크롬에서 먼저 이거 보면서 값 들어오는지 확인)
-    // console.log("gyro:", event.gamma, event.beta);
+  const nx = THREE.MathUtils.clamp(gamma / 60, -1, 1); // 좌우
+  const ny = THREE.MathUtils.clamp(beta / 60, -1, 1);  // 앞뒤
 
-    const gamma = event.gamma || 0; // 좌우 기울기
-    const beta = event.beta || 0;   // 앞뒤 기울기
-
-    const maxTiltX = 30;
-    const maxTiltY = 30;
-
-    let gx = THREE.MathUtils.clamp(gamma / maxTiltX, -1, 1);
-    let gy = THREE.MathUtils.clamp(beta / maxTiltY, -1, 1);
-
-    mouseX = gx;
-    mouseY = -gy;
-    console.log("deviceorientation fired", event.gamma, event.beta);
-  });
+  gyroX = nx;
+  gyroY = ny;
 }
 
+function setupGyro() {
+  const DOE = window.DeviceOrientationEvent;
+  console.log("DeviceOrientationEvent:", DOE);
 
+  if (!DOE) {
+    console.log("👉 이 브라우저는 DeviceOrientationEvent 를 지원하지 않음");
+    return;
+  }
+
+  const isSecure =
+    location.protocol === "https:" ||
+    location.hostname === "localhost" ||
+    location.hostname === "127.0.0.1";
+
+  if (!isSecure) {
+    console.warn(
+      "⚠️ 자이로는 보통 HTTPS(또는 localhost)에서만 동작합니다. 지금 주소를 확인해보세요."
+    );
+  }
+
+  if (typeof DOE.requestPermission === "function") {
+    // 옛 iOS 스타일 – 유저 제스처 필요
+    const btn = document.createElement("button");
+    btn.textContent = "📱 기울여서 보기 ON";
+    btn.id = "gyroBtn";
+    btn.style.position = "fixed";
+    btn.style.top = "16px";
+    btn.style.left = "16px";
+    btn.style.zIndex = "9999";
+    btn.style.padding = "8px 12px";
+    btn.style.borderRadius = "20px";
+    btn.style.border = "none";
+    btn.style.fontSize = "12px";
+    btn.style.background = "rgba(0,0,0,0.6)";
+    btn.style.color = "#fff";
+    btn.style.backdropFilter = "blur(10px)";
+    document.body.appendChild(btn);
+
+    btn.addEventListener("click", async () => {
+      try {
+        const state = await DOE.requestPermission();
+        console.log("gyro permission:", state);
+        if (state === "granted") {
+          useGyro = true;
+          window.addEventListener("deviceorientation", handleOrientation, true);
+          btn.remove();
+        } else {
+          alert(
+            "자이로 접근이 거부되었습니다.\n설정 > Safari > 모션 및 방향 접근을 확인해 주세요."
+          );
+        }
+      } catch (err) {
+        console.error("gyro permission error", err);
+        alert("자이로 권한 요청 중 오류가 발생했습니다.");
+      }
+    });
+  } else {
+    // 최신 iOS/안드 – OS 설정만 켜져 있으면 바로 사용
+    useGyro = true;
+    window.addEventListener("deviceorientation", handleOrientation, true);
+  }
+}
+
+if (isMobile) {
+  setupGyro();
+}
+
+/* ============================================================================
+ *  리사이즈 & 줌
+ * ==========================================================================*/
+
+renderer.domElement.addEventListener(
+  "wheel",
+  (event) => {
+    event.preventDefault();
+    const zoomSpeed = 0.002;
+    const delta = event.deltaY * zoomSpeed;
+    const minDist = 8;
+    const maxDist = 25;
+
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+
+    const newPos = camera.position.clone().addScaledVector(dir, delta * 20);
+    const distance = newPos.length();
+
+    if (distance > minDist && distance < maxDist) {
+      camera.position.copy(newPos);
+    }
+  },
+  { passive: false }
+);
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bokehPass.setSize(window.innerWidth, window.innerHeight);
+});
 
 /* ============================================================================
  *  애니메이션 루프
@@ -1229,7 +1250,6 @@ function animate(time) {
   const delta = (time - lastTime) / 1000;
   lastTime = time;
 
-  // 자동 회전 + 드래그 관성
   if (!isDragging) {
     const autoSpeed = 0.2;
     baseRotationY += autoSpeed * delta;
@@ -1243,18 +1263,18 @@ function animate(time) {
     treeGroup.rotation.y += (targetY - treeGroup.rotation.y) * 0.1;
   }
 
-  // 카메라 패럴럭스
+  const inputX = useGyro ? gyroX : mouseX;
+  const inputY = useGyro ? gyroY : mouseY;
+
   const baseCamY = 6;
-  const targetCamX = mouseX * -12;
-  const targetCamY = baseCamY + mouseY * 6;
+  const targetCamX = inputX * -12;
+  const targetCamY = baseCamY + inputY * 6;
 
   camera.position.x += (targetCamX - camera.position.x) * 0.05;
   camera.position.y += (targetCamY - camera.position.y) * 0.05;
 
-  // 별 회전
   star.rotation.y -= delta * 2;
 
-  // 라이트 궤도
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
     const { light, sphere, glow } = movingLights[i];
@@ -1275,24 +1295,17 @@ function animate(time) {
     glow.position.copy(light.position);
   }
 
-  // 🌊 가지에 매달린 카드 스윙 (각 카드 축을 따라 좌우로 흔들림)
   for (const ho of hangingObjects) {
     const k = ho.stiffness;
     const d = ho.damping;
 
-    // 단진자 스프링 방정식: θ'' = -k θ - d θ'
-    ho.vel += (-k * ho.angle) * delta;   // 복원력
-    ho.vel -= ho.vel * d * delta;        // 감쇠(마찰)
-    ho.angle += ho.vel * delta;          // 각도 적분
+    ho.vel += (-k * ho.angle) * delta;
+    ho.vel -= ho.vel * d * delta;
+    ho.angle += ho.vel * delta;
 
-    // 🎯 카드별로 계산한 축(axis)을 기준으로 회전 적용
-    //     axis = radial × gravity 라서
-    //     → 트리에 걸린 상태로 좌우로 흔들리는 느낌
     ho.hanger.quaternion.setFromAxisAngle(ho.axis, -ho.angle);
   }
 
-
-  // 🌟 트리 표면 전구 깜빡임
   const t2 = time * 0.001;
   for (let i = 0; i < treeBulbs.length; i++) {
     const bulb = treeBulbs[i];
@@ -1301,7 +1314,6 @@ function animate(time) {
     sprite.material.opacity = pulse;
   }
 
-  // 눈 떨어지는 애니메이션
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
     let y = pos.getY(i);
@@ -1316,9 +1328,6 @@ function animate(time) {
   camera.lookAt(0, tree.position.y, 0);
   composer.render();
 }
-
-console.log("DeviceOrientationEvent:", window.DeviceOrientationEvent);
-console.log("requestPermission:", DeviceOrientationEvent && DeviceOrientationEvent.requestPermission);
 
 animate(0);
 
