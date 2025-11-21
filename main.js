@@ -1137,6 +1137,73 @@ function handleOrientation(event) {
   gyroY = ny;
 }
 
+// 🔹 임시 자이로 권한/동작 테스트용 버튼
+function createTempGyroButton() {
+  const btn = document.createElement("button");
+  btn.textContent = "📱 자이로 테스트";
+  btn.style.position = "fixed";
+  btn.style.top = "16px";
+  btn.style.right = "16px";
+  btn.style.zIndex = "9999";
+  btn.style.padding = "8px 12px";
+  btn.style.borderRadius = "20px";
+  btn.style.border = "none";
+  btn.style.fontSize = "12px";
+  btn.style.background = "rgba(0,0,0,0.6)";
+  btn.style.color = "#fff";
+  btn.style.backdropFilter = "blur(10px)";
+  document.body.appendChild(btn);
+
+  btn.addEventListener("click", async () => {
+    console.log("▶ Gyro test button clicked");
+
+    if (!window.DeviceOrientationEvent) {
+      alert("이 브라우저는 DeviceOrientationEvent 를 지원하지 않습니다.");
+      return;
+    }
+
+    const DOE = window.DeviceOrientationEvent;
+    console.log("DeviceOrientationEvent:", DOE);
+    console.log(
+      "requestPermission:",
+      typeof DOE.requestPermission === "function"
+    );
+
+    // ▽ 예전 iOS 스타일 (requestPermission 있음)
+    if (typeof DOE.requestPermission === "function") {
+      try {
+        const state = await DOE.requestPermission();
+        console.log("gyro permission result:", state);
+        if (state === "granted") {
+          useGyro = true;
+          window.addEventListener("deviceorientation", handleOrientation, true);
+          alert("✅ 자이로 권한 허용, 기울여 보세요!");
+          btn.textContent = "📱 자이로 ON";
+        } else {
+          alert(
+            "❌ 자이로 권한이 거부되었습니다.\n설정 > Safari > 모션 & 방향 접근을 확인해 주세요."
+          );
+        }
+      } catch (err) {
+        console.error("gyro permission error", err);
+        alert("자이로 권한 요청 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
+      }
+    } else {
+      // ▽ 최신 iOS / 크롬 등: requestPermission 없음 → 바로 리스너 등록
+      alert(
+        "requestPermission 이 없습니다.\n바로 자이로 리스너를 등록합니다.\n값이 안 움직이면 HTTPS / iOS 설정을 확인해 주세요."
+      );
+      useGyro = true;
+      window.addEventListener("deviceorientation", handleOrientation, true);
+      btn.textContent = "📱 자이로 ON (no reqPermission)";
+    }
+  });
+}
+
+// 🔸 페이지 로드 시 임시 버튼 만들기
+createTempGyroButton();
+
+
 function setupGyro() {
   const DOE = window.DeviceOrientationEvent;
   console.log("DeviceOrientationEvent:", DOE);
@@ -1200,9 +1267,9 @@ function setupGyro() {
   }
 }
 
-if (isMobile) {
-  setupGyro();
-}
+// if (isMobile) {
+//   setupGyro();
+// }
 
 /* ============================================================================
  *  리사이즈 & 줌
