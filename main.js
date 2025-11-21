@@ -1052,23 +1052,71 @@ function closeWishPanel() {
 wishCloseBtn.addEventListener("click", closeWishPanel);
 
 /* ============================================================================
- *  드래그 회전 / 줌 / 리사이즈
+ *  입력 상태 (마우스 / 터치 / 자이로)
  * ==========================================================================*/
 
 let isDragging = false;
 let prevX = 0;
 const dragRotateSpeed = 0.005;
 
+// 패럴럭스용 -1 ~ 1
 let mouseX = 0;
 let mouseY = 0;
 
+// 트리 회전 관성
 let baseRotationY = 0;
 let spinVelocityY = 0;
 
-renderer.domElement.addEventListener("mousedown", (event) => {
+// 간단 모바일 판별
+const isMobile =
+  "ontouchstart" in window ||
+  (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+
+// iOS Safari 같은 환경에서는 requestPermission 필요
+const needsGyroPermission =
+  typeof DeviceOrientationEvent !== "undefined" &&
+  typeof DeviceOrientationEvent.requestPermission === "function";
+
+// 모바일 + 자이로 상태
+let useGyro = !needsGyroPermission; 
+// 👉 permission이 필요 없는 경우(안드/일반 브라우저)는 바로 true로 시작
+
+
+/* ============================================================================
+ *  드래그 회전 / 줌 / 리사이즈
+ * ==========================================================================*/
+
+// 공용 드래그 시작
+function beginDrag(clientX) {
   isDragging = true;
-  prevX = event.clientX;
+  prevX = clientX;
   spinVelocityY = 0;
+}
+
+// 공용 드래그 이동
+function moveDrag(clientX) {
+  const deltaX = clientX - prevX;
+  prevX = clientX;
+
+  const deltaRot = deltaX * dragRotateSpeed;
+
+  // 트리 회전
+  treeGroup.rotation.y += deltaRot;
+  baseRotationY = treeGroup.rotation.y;
+  spinVelocityY = deltaRot;
+
+  // 카드 관성
+  const impulse = deltaRot * 8.0;
+  for (const ho of hangingObjects) {
+    ho.vel += impulse;
+  }
+}
+
+// ======================
+//  데스크탑: 마우스
+// ======================
+renderer.domElement.addEventListener("mousedown", (event) => {
+  beginDrag(event.clientX);
 });
 
 window.addEventListener("mouseup", () => {
@@ -1076,59 +1124,99 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  // 패럴럭스는 항상 업데이트
-  mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-  mouseY = (event.clientY / window.innerHeight) * 2 - 1;
-
-  if (!isDragging) return;
-
-  const deltaX = event.clientX - prevX;
-  prevX = event.clientX;
-
-  const deltaRot = deltaX * dragRotateSpeed;
-
-  // 트리 자체 회전
-  treeGroup.rotation.y += deltaRot;
-  baseRotationY = treeGroup.rotation.y;
-  spinVelocityY = deltaRot;
-
-  // 🎯 드래그 시 카드들에 관성 임펄스 주기
-  const impulse = deltaRot * 8.0; // 세기 조절
-  for (const ho of hangingObjects) {
-    ho.vel += impulse;
+  if (!isDragging) {
+    // 데스크탑에서는 마우스 위치를 그대로 패럴럭스로 사용
+    mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+    mouseY = (event.clientY / window.innerHeight) * 2 - 1;
+    return;
   }
+  moveDrag(event.clientX);
 });
 
+// ======================
+//  모바일: 터치
+// ======================
 renderer.domElement.addEventListener(
-  "wheel",
+  "touchstart",
   (event) => {
-    event.preventDefault();
-    const zoomSpeed = 0.002;
-    const delta = event.deltaY * zoomSpeed;
-    const minDist = 8;
-    const maxDist = 25;
+    if (!isMobile) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    beginDrag(touch.clientX);
 
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-
-    const newPos = camera.position.clone().addScaledVector(dir, delta * 20);
-    const distance = newPos.length();
-
-    if (distance > minDist && distance < maxDist) {
-      camera.position.copy(newPos);
+    // 🔐 iOS 사파리에서만 permission 요청
+    if (needsGyroPermission && !useGyro) {
+      DeviceOrientationEvent.requestPermission()
+        .then((resp) => {
+          console.log("DeviceOrientation permission:", resp);
+          if (resp === "granted") {
+            useGyro = true;
+            console.log("✅ Gyro enabled");
+          } else {
+            console.log("❌ Gyro denied:", resp);
+          }
+        })
+        .catch((err) => {
+          console.warn("Gyro permission error", err);
+        });
     }
   },
-  { passive: false }
+  { passive: true }
 );
 
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
 
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  bokehPass.setSize(window.innerWidth, window.innerHeight);
-});
+window.addEventListener(
+  "touchmove",
+  (event) => {
+    if (!isMobile || !isDragging) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    // 터치 드래그로 트리 회전
+    moveDrag(touch.clientX);
+  },
+  { passive: true }
+);
+
+window.addEventListener(
+  "touchend",
+  () => {
+    if (!isMobile) return;
+    isDragging = false;
+  },
+  { passive: true }
+);
+
+/* ============================================================================
+ *  모바일 자이로 → 패럴럭스 입력
+ * ==========================================================================*/
+
+// 자이로 이벤트 리스너 (iOS / 안드로이드 공통)
+if (window.DeviceOrientationEvent) {
+  window.addEventListener("deviceorientation", (event) => {
+    if (!isMobile) return;
+    // iOS에서는 permission 필요 / 그 외에서는 바로 사용
+    if (needsGyroPermission && !useGyro) return;
+
+    // 🔍 디버그용 로그 (모바일 크롬에서 먼저 이거 보면서 값 들어오는지 확인)
+    // console.log("gyro:", event.gamma, event.beta);
+
+    const gamma = event.gamma || 0; // 좌우 기울기
+    const beta = event.beta || 0;   // 앞뒤 기울기
+
+    const maxTiltX = 30;
+    const maxTiltY = 30;
+
+    let gx = THREE.MathUtils.clamp(gamma / maxTiltX, -1, 1);
+    let gy = THREE.MathUtils.clamp(beta / maxTiltY, -1, 1);
+
+    mouseX = gx;
+    mouseY = -gy;
+    console.log("deviceorientation fired", event.gamma, event.beta);
+  });
+}
+
+
 
 /* ============================================================================
  *  애니메이션 루프
@@ -1228,6 +1316,9 @@ function animate(time) {
   camera.lookAt(0, tree.position.y, 0);
   composer.render();
 }
+
+console.log("DeviceOrientationEvent:", window.DeviceOrientationEvent);
+console.log("requestPermission:", DeviceOrientationEvent && DeviceOrientationEvent.requestPermission);
 
 animate(0);
 
