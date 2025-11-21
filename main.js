@@ -1135,17 +1135,55 @@ window.addEventListener(
  * ==========================================================================*/
 
 
+// 📌 처음 한 번은 "현재 들고 있는 자세"를 기준점으로 삼고,
+// 그 이후에는 기준점이 현재 자세 쪽으로 천천히 따라오게 하는 버전
 function handleOrientation(event) {
-  const { beta, gamma } = event;
+  const { beta, gamma } = event; // beta: 앞/뒤, gamma: 좌/우
   if (beta == null || gamma == null) return;
 
-  const nx = THREE.MathUtils.clamp(gamma / 60, -1, 1); // 좌우
-  const ny = THREE.MathUtils.clamp(beta / 20, -1, 1);  // 앞뒤
+  // 1) 최초 한 번: 지금 자세를 기준으로 저장
+  if (!gyroCalibrated) {
+    gyroBaseBeta = beta;
+    gyroBaseGamma = gamma;
+    gyroCalibrated = true;
+    console.log("✅ Gyro first calibrate:", gyroBaseBeta, gyroBaseGamma);
+  }
 
-  // 🔁 여기서 자이로 값을 통째로 반전
-  gyroX = -nx;
-  gyroY = -ny;
+  // 2) 현재 값과 기준점의 차이(= 실제 패럴럭스에 쓸 값)
+  let diffGamma = gamma - gyroBaseGamma; // 좌우
+  let diffBeta  = beta  - gyroBaseBeta;  // 상하
+
+  // 3) 기준점이 "천천히" 현재 값 쪽으로 따라오게 해서
+  //    오랫동안 들고 있는 자세가 자연스럽게 0이 되도록 만듦
+  //
+  //    neutralFollowStrength:
+  //      - 0.0  ~ 0.01  : 기준이 거의 고정 (거의 안 따라옴)
+  //      - 0.02 ~ 0.05  : 은근히 서서히 따라옴 (추천)
+  //      - 0.1 이상     : 너무 빨리 따라와서 패럴럭스가 줄어들 수 있음
+  const neutralFollowStrength = 0.02;
+  gyroBaseGamma += diffGamma * neutralFollowStrength;
+  gyroBaseBeta  += diffBeta  * neutralFollowStrength;
+
+  // 4) 기준이 조금 이동했으니, 다시 한 번 차이를 구해서 실제 입력으로 사용
+  diffGamma = gamma - gyroBaseGamma;
+  diffBeta  = beta  - gyroBaseBeta;
+
+  // 5) 감도 & 정규화
+  //    나누는 숫자가 작을수록 더 예민해짐 (예: 30은 예민, 60은 둔감)
+  const nx = THREE.MathUtils.clamp(diffGamma / 40, -1, 1); // 좌우
+  const ny = THREE.MathUtils.clamp(diffBeta  / 40, -1, 1); // 상하
+
+  // 6) 방향(부호) 결정
+  //    원하면 여기서 -를 빼거나, 한쪽만 -를 붙여서 상하/좌우 따로 반전 가능
+  let targetX = -nx;
+  let targetY = -ny;
+
+  // 7) 값 튀는 거 조금 줄이려고 부드럽게 보간
+  const smooth = 0.15; // 0에 가까울수록 뻣뻣, 1에 가까울수록 즉각
+  gyroX = gyroX * (1 - smooth) + targetX * smooth;
+  gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
+
 
 function setupGyro() {
   const DOE = window.DeviceOrientationEvent;
