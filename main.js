@@ -1137,14 +1137,14 @@ window.addEventListener(
 // 🔧 자이로 감도 파라미터
 //  - sensitivityX, sensitivityY: 작을수록 더 민감, 클수록 둔해짐
 const GYRO_SENSITIVITY_X = 30; // gamma (좌/우)
-const GYRO_SENSITIVITY_Y = 30; // beta (앞/뒤)
+const GYRO_SENSITIVITY_Y = 10; // beta (앞/뒤)
 
 function handleOrientation(event) {
   const { beta, gamma } = event;
   if (beta == null || gamma == null) return;
 
-  const nx = THREE.MathUtils.clamp(gamma / 40, -1, 1); // 좌우
-  const ny = THREE.MathUtils.clamp(beta / 40, -1, 1);  // 앞뒤
+  const nx = THREE.MathUtils.clamp(gamma / 60, -1, 1); // 좌우
+  const ny = THREE.MathUtils.clamp(beta / 20, -1, 1);  // 앞뒤
 
   // 🔁 여기서 자이로 값을 통째로 반전
   gyroX = -nx;
