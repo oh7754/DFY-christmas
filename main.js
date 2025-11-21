@@ -1172,8 +1172,8 @@ function handleOrientation(event) {
   diffBeta  = beta  - gyroBaseBeta;
 
   // 5) 감도 설정 (나누는 값이 작을수록 더 예민해짐)
-  const nxRaw = THREE.MathUtils.clamp(diffGamma / 10, -1, 1); // 좌우
-  const nyRaw = THREE.MathUtils.clamp(diffBeta  /10, -1, 1); // 상하
+  const nxRaw = THREE.MathUtils.clamp(diffGamma / 5, -1, 1); // 좌우
+  const nyRaw = THREE.MathUtils.clamp(diffBeta  /5, -1, 1); // 상하
 
   // 6) 원하는 방향(부호)로 뒤집기
   //   -nx, -ny로 하면 "폰 기울이는 방향과 반대로" 카메라가 움직이는 느낌
