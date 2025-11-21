@@ -1026,33 +1026,32 @@ wishCloseBtn.addEventListener("click", closeWishPanel);
  *  입력 상태 (마우스 / 터치 / 자이로)
  * ==========================================================================*/
 
+// ▶ 드래그 상태
 let isDragging = false;
 let prevX = 0;
-const dragRotateSpeed = 0.005;
+const dragRotateSpeed = 0.005; // 드래그 감도 (값 키우면 더 빨리 돈다)
 
+// ▶ 카메라 패럴럭스 입력 (마우스 / 자이로 공용)
 let mouseX = 0;
 let mouseY = 0;
-
 let gyroX = 0;
 let gyroY = 0;
-let useGyro = false; // 실제로 자이로 값을 쓸지 여부
+let useGyro = false; // true면 자이로값, false면 마우스값으로 패럴럭스
 
+// ▶ 트리 회전(자동 회전 + 드래그 관성)
 let baseRotationY = 0;
 let spinVelocityY = 0;
 
+// ▶ 모바일 판별
 const isMobile =
   "ontouchstart" in window ||
   (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
-
-const needsGyroPermission =
-  typeof window.DeviceOrientationEvent !== "undefined" &&
-  typeof window.DeviceOrientationEvent.requestPermission === "function";
 
 // 공용 드래그 시작
 function beginDrag(clientX) {
   isDragging = true;
   prevX = clientX;
-  spinVelocityY = 0;
+  spinVelocityY = 0; // 드래그 시작 시 관성 초기화
 }
 
 // 공용 드래그 이동
@@ -1062,17 +1061,21 @@ function moveDrag(clientX) {
 
   const deltaRot = deltaX * dragRotateSpeed;
 
+  // 트리 Y축 회전
   treeGroup.rotation.y += deltaRot;
   baseRotationY = treeGroup.rotation.y;
   spinVelocityY = deltaRot;
 
+  // 카드들에도 회전 관성 전달
   const impulse = deltaRot * 8.0;
   for (const ho of hangingObjects) {
     ho.vel += impulse;
   }
 }
 
-// 데스크탑 마우스
+// ======================
+//  데스크탑: 마우스
+// ======================
 renderer.domElement.addEventListener("mousedown", (event) => {
   beginDrag(event.clientX);
 });
@@ -1083,6 +1086,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (event) => {
   if (!isDragging) {
+    // 마우스 위치를 패럴럭스로 사용
     mouseX = (event.clientX / window.innerWidth) * 2 - 1;
     mouseY = (event.clientY / window.innerHeight) * 2 - 1;
     return;
@@ -1090,7 +1094,9 @@ window.addEventListener("mousemove", (event) => {
   moveDrag(event.clientX);
 });
 
-// 모바일 터치
+// ======================
+//  모바일: 터치
+// ======================
 renderer.domElement.addEventListener(
   "touchstart",
   (event) => {
@@ -1126,93 +1132,31 @@ window.addEventListener(
  *  자이로(기울기 센서) 세팅
  * ==========================================================================*/
 
+// 🔧 자이로 감도 파라미터
+//  - sensitivityX, sensitivityY: 작을수록 더 민감, 클수록 둔해짐
+const GYRO_SENSITIVITY_X = 10; // gamma (좌/우)
+const GYRO_SENSITIVITY_Y = 10; // beta (앞/뒤)
+
 function handleOrientation(event) {
-  const { beta, gamma } = event;
+  const { beta, gamma } = event; // beta: 앞/뒤, gamma: 좌/우
   if (beta == null || gamma == null) return;
 
-  const nx = THREE.MathUtils.clamp(gamma / 60, -1, 1); // 좌우
-  const ny = THREE.MathUtils.clamp(beta / 60, -1, 1);  // 앞뒤
+  // -90~90 / -180~180 정도 들어오는 값을 -1~1 로 정규화
+  const nx = THREE.MathUtils.clamp(gamma / GYRO_SENSITIVITY_X, -1, 1);
+  const ny = THREE.MathUtils.clamp(beta / GYRO_SENSITIVITY_Y, -1, 1);
 
   gyroX = nx;
   gyroY = ny;
 }
 
-// 🔹 임시 자이로 권한/동작 테스트용 버튼
-function createTempGyroButton() {
-  const btn = document.createElement("button");
-  btn.textContent = "📱 자이로 테스트";
-  btn.style.position = "fixed";
-  btn.style.top = "16px";
-  btn.style.right = "16px";
-  btn.style.zIndex = "9999";
-  btn.style.padding = "8px 12px";
-  btn.style.borderRadius = "20px";
-  btn.style.border = "none";
-  btn.style.fontSize = "12px";
-  btn.style.background = "rgba(0,0,0,0.6)";
-  btn.style.color = "#fff";
-  btn.style.backdropFilter = "blur(10px)";
-  document.body.appendChild(btn);
-
-  btn.addEventListener("click", async () => {
-    console.log("▶ Gyro test button clicked");
-
-    if (!window.DeviceOrientationEvent) {
-      alert("이 브라우저는 DeviceOrientationEvent 를 지원하지 않습니다.");
-      return;
-    }
-
-    const DOE = window.DeviceOrientationEvent;
-    console.log("DeviceOrientationEvent:", DOE);
-    console.log(
-      "requestPermission:",
-      typeof DOE.requestPermission === "function"
-    );
-
-    // ▽ 예전 iOS 스타일 (requestPermission 있음)
-    if (typeof DOE.requestPermission === "function") {
-      try {
-        const state = await DOE.requestPermission();
-        console.log("gyro permission result:", state);
-        if (state === "granted") {
-          useGyro = true;
-          window.addEventListener("deviceorientation", handleOrientation, true);
-          alert("✅ 자이로 권한 허용, 기울여 보세요!");
-          btn.textContent = "📱 자이로 ON";
-        } else {
-          alert(
-            "❌ 자이로 권한이 거부되었습니다.\n설정 > Safari > 모션 & 방향 접근을 확인해 주세요."
-          );
-        }
-      } catch (err) {
-        console.error("gyro permission error", err);
-        alert("자이로 권한 요청 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
-      }
-    } else {
-      // ▽ 최신 iOS / 크롬 등: requestPermission 없음 → 바로 리스너 등록
-      alert(
-        "requestPermission 이 없습니다.\n바로 자이로 리스너를 등록합니다.\n값이 안 움직이면 HTTPS / iOS 설정을 확인해 주세요."
-      );
-      useGyro = true;
-      window.addEventListener("deviceorientation", handleOrientation, true);
-      btn.textContent = "📱 자이로 ON (no reqPermission)";
-    }
-  });
-}
-
-// 🔸 페이지 로드 시 임시 버튼 만들기
-createTempGyroButton();
-
-
 function setupGyro() {
   const DOE = window.DeviceOrientationEvent;
-  console.log("DeviceOrientationEvent:", DOE);
-
   if (!DOE) {
-    console.log("👉 이 브라우저는 DeviceOrientationEvent 를 지원하지 않음");
+    console.log("👉 DeviceOrientationEvent 미지원 브라우저");
     return;
   }
 
+  // https / localhost 환경 체크 (iOS는 보안 컨텍스트 아니면 센서 막힐 수 있음)
   const isSecure =
     location.protocol === "https:" ||
     location.hostname === "localhost" ||
@@ -1220,14 +1164,14 @@ function setupGyro() {
 
   if (!isSecure) {
     console.warn(
-      "⚠️ 자이로는 보통 HTTPS(또는 localhost)에서만 동작합니다. 지금 주소를 확인해보세요."
+      "⚠️ 자이로는 보통 HTTPS(또는 localhost)에서만 동작합니다. 현재 주소를 확인해 주세요."
     );
   }
 
+  // iOS 구형 스타일: requestPermission 필요
   if (typeof DOE.requestPermission === "function") {
-    // 옛 iOS 스타일 – 유저 제스처 필요
     const btn = document.createElement("button");
-    btn.textContent = "📱 기울여서 보기 ON";
+    btn.textContent = "📱 기울여서 보기";
     btn.id = "gyroBtn";
     btn.style.position = "fixed";
     btn.style.top = "16px";
@@ -1240,6 +1184,7 @@ function setupGyro() {
     btn.style.background = "rgba(0,0,0,0.6)";
     btn.style.color = "#fff";
     btn.style.backdropFilter = "blur(10px)";
+    btn.style.cursor = "pointer";
     document.body.appendChild(btn);
 
     btn.addEventListener("click", async () => {
@@ -1249,7 +1194,8 @@ function setupGyro() {
         if (state === "granted") {
           useGyro = true;
           window.addEventListener("deviceorientation", handleOrientation, true);
-          btn.remove();
+          btn.textContent = "📱 기울여서 보기 ON ✅";
+          setTimeout(() => btn.remove(), 1500);
         } else {
           alert(
             "자이로 접근이 거부되었습니다.\n설정 > Safari > 모션 및 방향 접근을 확인해 주세요."
@@ -1261,15 +1207,17 @@ function setupGyro() {
       }
     });
   } else {
-    // 최신 iOS/안드 – OS 설정만 켜져 있으면 바로 사용
+    // requestPermission 없는 환경 (안드로이드 / 최신 브라우저)
     useGyro = true;
     window.addEventListener("deviceorientation", handleOrientation, true);
+    console.log("🔓 requestPermission 없음 → 바로 자이로 사용 시도");
   }
 }
 
-// if (isMobile) {
-//   setupGyro();
-// }
+// 모바일에서만 자이로 세팅 시도
+if (isMobile) {
+  setupGyro();
+}
 
 /* ============================================================================
  *  리사이즈 & 줌
@@ -1312,16 +1260,22 @@ window.addEventListener("resize", () => {
 
 let lastTime = 0;
 
+// 🔧 카메라 패럴럭스 파라미터
+const PARALLAX_X = 12;     // 좌우로 얼마나 많이 움직일지
+const PARALLAX_Y = 6;      // 위아래로 얼마나 많이 움직일지
+const CAMERA_FOLLOW = 0.05; // 카메라가 타겟을 따라가는 속도 (0.02~0.1 정도 추천)
+
 function animate(time) {
   requestAnimationFrame(animate);
   const delta = (time - lastTime) / 1000;
   lastTime = time;
 
+  // 자동 회전 + 드래그 관성
   if (!isDragging) {
     const autoSpeed = 0.2;
-    baseRotationY += autoSpeed * delta;
-    baseRotationY += spinVelocityY;
-    spinVelocityY *= 0.5;
+    baseRotationY += autoSpeed * delta; // 기본 자동 회전
+    baseRotationY += spinVelocityY;     // 드래그 후 남은 관성
+    spinVelocityY *= 0.5;               // 관성 감쇠
 
     const targetX = 0;
     const targetY = baseRotationY;
@@ -1330,18 +1284,22 @@ function animate(time) {
     treeGroup.rotation.y += (targetY - treeGroup.rotation.y) * 0.1;
   }
 
+  // ▶ 입력 값을 자이로 or 마우스로 선택
   const inputX = useGyro ? gyroX : mouseX;
   const inputY = useGyro ? gyroY : mouseY;
 
+  // 🔧 여기서 카메라 패럴럭스 세기 조절
   const baseCamY = 6;
-  const targetCamX = inputX * -12;
-  const targetCamY = baseCamY + inputY * 6;
+  const targetCamX = inputX * -PARALLAX_X;
+  const targetCamY = baseCamY + inputY * PARALLAX_Y;
 
-  camera.position.x += (targetCamX - camera.position.x) * 0.05;
-  camera.position.y += (targetCamY - camera.position.y) * 0.05;
+  camera.position.x += (targetCamX - camera.position.x) * CAMERA_FOLLOW;
+  camera.position.y += (targetCamY - camera.position.y) * CAMERA_FOLLOW;
 
+  // 별 회전
   star.rotation.y -= delta * 2;
 
+  // 라이트 궤도
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
     const { light, sphere, glow } = movingLights[i];
@@ -1362,17 +1320,19 @@ function animate(time) {
     glow.position.copy(light.position);
   }
 
+  // 🌊 가지에 매달린 카드 스윙
   for (const ho of hangingObjects) {
     const k = ho.stiffness;
     const d = ho.damping;
 
-    ho.vel += (-k * ho.angle) * delta;
-    ho.vel -= ho.vel * d * delta;
-    ho.angle += ho.vel * delta;
+    ho.vel += (-k * ho.angle) * delta;   // 복원력
+    ho.vel -= ho.vel * d * delta;        // 마찰
+    ho.angle += ho.vel * delta;          // 적분
 
     ho.hanger.quaternion.setFromAxisAngle(ho.axis, -ho.angle);
   }
 
+  // 🌟 트리 표면 전구 깜빡임
   const t2 = time * 0.001;
   for (let i = 0; i < treeBulbs.length; i++) {
     const bulb = treeBulbs[i];
@@ -1381,6 +1341,7 @@ function animate(time) {
     sprite.material.opacity = pulse;
   }
 
+  // 눈 떨어지는 애니메이션
   const pos = snowGeo.attributes.position;
   for (let i = 0; i < snowCount; i++) {
     let y = pos.getY(i);
