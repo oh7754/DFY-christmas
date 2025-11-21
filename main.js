@@ -1298,7 +1298,7 @@ const PARALLAX_DESKTOP = {
 const PARALLAX_MOBILE = {
   x: 16,   // 좌우 (모바일) → 조금 더 과장
   y: 24,    // 상하 (모바일)
-  follow: 0.06, // 모바일은 살짝 더 빠르게 따라가게
+  follow: 1, // 모바일은 살짝 더 빠르게 따라가게
 };
 
 
