@@ -1188,6 +1188,64 @@ function handleOrientation(event) {
   gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
 
+// 📌 자이로 권한 요청 + 리스너 등록 버튼
+function setupGyroButton() {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) {
+    console.log("👉 이 브라우저는 DeviceOrientationEvent 를 지원하지 않음");
+    return;
+  }
+
+  // 🔘 화면 왼쪽 위에 '기울여서 보기' 버튼 하나 띄우기
+  const btn = document.createElement("button");
+  btn.textContent = "📱 기울여서 보기";
+  btn.style.position = "fixed";
+  btn.style.top = "16px";
+  btn.style.left = "16px";
+  btn.style.zIndex = "9999";
+  btn.style.padding = "8px 12px";
+  btn.style.borderRadius = "20px";
+  btn.style.border = "none";
+  btn.style.fontSize = "12px";
+  btn.style.background = "rgba(0,0,0,0.6)";
+  btn.style.color = "#fff";
+  btn.style.backdropFilter = "blur(10px)";
+  btn.style.cursor = "pointer";
+  document.body.appendChild(btn);
+
+  btn.addEventListener("click", async () => {
+    try {
+      // 🧪 옛날 iOS 스타일: requestPermission 존재
+      if (typeof DOE.requestPermission === "function") {
+        const state = await DOE.requestPermission();
+        console.log("gyro permission:", state);
+        if (state !== "granted") {
+          alert(
+            "자이로 접근이 거부되었습니다.\n설정 > Safari > 모션 및 방향 접근을 확인해 주세요."
+          );
+          return;
+        }
+      }
+      // ✅ 여기까지 왔으면 리스너 등록 + 자이로 사용 ON
+      useGyro = true;
+      window.addEventListener("deviceorientation", handleOrientation, true);
+
+      btn.textContent = "📱 기울여서 보기 ON";
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
+    } catch (err) {
+      console.error("gyro permission error", err);
+      alert("자이로 권한 요청 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
+    }
+  });
+}
+
+// 모바일에서만 버튼 생성
+if (isMobile) {
+  setupGyroButton();
+}
+
+
 
 /* ============================================================================
  *  리사이즈 & 줌
