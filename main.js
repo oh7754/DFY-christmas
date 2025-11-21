@@ -1172,8 +1172,8 @@ function handleOrientation(event) {
   diffBeta  = beta  - gyroBaseBeta;
 
   // 5) 감도 설정 (나누는 값이 작을수록 더 예민해짐)
-  const nxRaw = THREE.MathUtils.clamp(diffGamma / 10, -1, 1); // 좌우
-  const nyRaw = THREE.MathUtils.clamp(diffBeta  / 200, -1, 1); // 상하
+  const nxRaw = THREE.MathUtils.clamp(diffGamma / 3, -1, 1); // 좌우
+  const nyRaw = THREE.MathUtils.clamp(diffBeta  / 1, -1, 1); // 상하
 
   // 6) 원하는 방향(부호)로 뒤집기
   //   -nx, -ny로 하면 "폰 기울이는 방향과 반대로" 카메라가 움직이는 느낌
@@ -1183,7 +1183,7 @@ function handleOrientation(event) {
 
   // 7) 부드럽게 보간해서 튐 방지
   //    smooth: 0.1 → 조금 뻣뻣, 0.2~0.3 → 꽤 부드러움
-  const smooth = 0.1;
+  const smooth = 0.03;
   gyroX = gyroX * (1 - smooth) + targetX * smooth;
   gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
@@ -1288,10 +1288,19 @@ window.addEventListener("resize", () => {
 
 let lastTime = 0;
 
-// 🔧 카메라 패럴럭스 파라미터
-const PARALLAX_X = 12;     // 좌우로 얼마나 많이 움직일지
-const PARALLAX_Y = 6;      // 위아래로 얼마나 많이 움직일지
-const CAMERA_FOLLOW = 0.05; // 카메라가 타겟을 따라가는 속도 (0.02~0.1 정도 추천)
+// 🔧 PC / 모바일 각각 다른 패럴럭스 설정
+const PARALLAX_DESKTOP = {
+  x: 12,   // 좌우 (PC)
+  y: 6,    // 상하 (PC)
+  follow: 0.05, // 카메라 따라가는 속도 (PC)
+};
+
+const PARALLAX_MOBILE = {
+  x: 16,   // 좌우 (모바일) → 조금 더 과장
+  y: 12,    // 상하 (모바일)
+  follow: 0.06, // 모바일은 살짝 더 빠르게 따라가게
+};
+
 
 function animate(time) {
   requestAnimationFrame(animate);
@@ -1301,29 +1310,31 @@ function animate(time) {
   // 자동 회전 + 드래그 관성
   if (!isDragging) {
     const autoSpeed = 0.2;
-    baseRotationY += autoSpeed * delta; // 기본 자동 회전
-    baseRotationY += spinVelocityY;     // 드래그 후 남은 관성
-    spinVelocityY *= 0.5;               // 관성 감쇠
+    baseRotationY += autoSpeed * delta;
+    baseRotationY += spinVelocityY;
+    spinVelocityY *= 0.5;
 
-    const targetX = 0;
-    const targetY = baseRotationY;
+    const targetXRot = 0;
+    const targetYRot = baseRotationY;
 
-    treeGroup.rotation.x += (targetX - treeGroup.rotation.x) * 0.1;
-    treeGroup.rotation.y += (targetY - treeGroup.rotation.y) * 0.1;
+    treeGroup.rotation.x += (targetXRot - treeGroup.rotation.x) * 0.1;
+    treeGroup.rotation.y += (targetYRot - treeGroup.rotation.y) * 0.1;
   }
 
   // ▶ 입력 값을 자이로 or 마우스로 선택
   const inputX = useGyro ? gyroX : mouseX;
   const inputY = useGyro ? gyroY : mouseY;
 
-  // 🔧 여기서 카메라 패럴럭스 세기 조절
+  // ✅ 여기서 디바이스별 패럴럭스 설정 선택
+  const p = isMobile ? PARALLAX_MOBILE : PARALLAX_DESKTOP;
+
   const baseCamY = 6;
-  const targetCamX = inputX * -PARALLAX_X;
-  const targetCamY = baseCamY + inputY * PARALLAX_Y;
+  const targetCamX = inputX * -p.x;             // 좌우 세기
+  const targetCamY = baseCamY + inputY * p.y;   // 상하 세기
 
-  camera.position.x += (targetCamX - camera.position.x) * CAMERA_FOLLOW;
-  camera.position.y += (targetCamY - camera.position.y) * CAMERA_FOLLOW;
-
+  camera.position.x += (targetCamX - camera.position.x) * p.follow;
+  camera.position.y += (targetCamY - camera.position.y) * p.follow;
+  
   // 별 회전
   star.rotation.y -= delta * 2;
 
