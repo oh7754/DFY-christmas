@@ -1160,7 +1160,7 @@ function handleOrientation(event) {
   //      - 0.0  ~ 0.01  : 기준이 거의 고정 (거의 안 따라옴)
   //      - 0.02 ~ 0.05  : 은근히 서서히 따라옴 (추천)
   //      - 0.1 이상     : 너무 빨리 따라와서 패럴럭스가 줄어들 수 있음
-  const neutralFollowStrength = 0.02;
+  const neutralFollowStrength = 0.01;
   gyroBaseGamma += diffGamma * neutralFollowStrength;
   gyroBaseBeta  += diffBeta  * neutralFollowStrength;
 
@@ -1170,7 +1170,7 @@ function handleOrientation(event) {
 
   // 5) 감도 & 정규화
   //    나누는 숫자가 작을수록 더 예민해짐 (예: 30은 예민, 60은 둔감)
-  const nx = THREE.MathUtils.clamp(diffGamma / 40, -1, 1); // 좌우
+  const nx = THREE.MathUtils.clamp(diffGamma / 35, -1, 1); // 좌우
   const ny = THREE.MathUtils.clamp(diffBeta  / 40, -1, 1); // 상하
 
   // 6) 방향(부호) 결정
