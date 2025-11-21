@@ -617,7 +617,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
  *  눈 파티클
  * ==========================================================================*/
 
-const snowCount = 800;
+const snowCount = 600;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
 for (let i = 0; i < snowCount; i++) {
@@ -718,7 +718,7 @@ function addImageToTree(docId, data) {
  *  트리 표면 전구
  * ==========================================================================*/
 
-const TREE_BULB_COUNT = 80;
+const TREE_BULB_COUNT = 30;
 const treeBulbs = [];
 
 function createTreeBulbs() {
@@ -740,12 +740,12 @@ function createTreeBulbs() {
 
     const pos = getRandomPositionOnTree();
     const dirFromCenter = new THREE.Vector3(pos.x, 0, pos.z).normalize();
-    pos.x += dirFromCenter.x * 0.1;
-    pos.z += dirFromCenter.z * 0.1;
+    pos.x += dirFromCenter.x * 0;
+    pos.z += dirFromCenter.z * 0;
 
     sprite.position.copy(pos);
 
-    const scale = 0.35 + Math.random() * 0.15;
+    const scale = 0.35 + Math.random() * 1.6;
     sprite.scale.set(scale, scale, 1);
 
     treeGroup.add(sprite);
@@ -1297,7 +1297,7 @@ const PARALLAX_DESKTOP = {
 
 const PARALLAX_MOBILE = {
   x: 16,   // 좌우 (모바일) → 조금 더 과장
-  y: 32,    // 상하 (모바일)
+  y: 24,    // 상하 (모바일)
   follow: 0.06, // 모바일은 살짝 더 빠르게 따라가게
 };
 
