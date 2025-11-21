@@ -1173,7 +1173,7 @@ function handleOrientation(event) {
 
   // 5) 감도 설정 (나누는 값이 작을수록 더 예민해짐)
   const nxRaw = THREE.MathUtils.clamp(diffGamma / 10, -1, 1); // 좌우
-  const nyRaw = THREE.MathUtils.clamp(diffBeta  / 20, -1, 1); // 상하
+  const nyRaw = THREE.MathUtils.clamp(diffBeta  / 2, -1, 1); // 상하
 
   // 6) 원하는 방향(부호)로 뒤집기
   //   -nx, -ny로 하면 "폰 기울이는 방향과 반대로" 카메라가 움직이는 느낌
@@ -1183,7 +1183,7 @@ function handleOrientation(event) {
 
   // 7) 부드럽게 보간해서 튐 방지
   //    smooth: 0.1 → 조금 뻣뻣, 0.2~0.3 → 꽤 부드러움
-  const smooth = 0.15;
+  const smooth = 0.13;
   gyroX = gyroX * (1 - smooth) + targetX * smooth;
   gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
