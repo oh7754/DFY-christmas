@@ -1163,7 +1163,7 @@ function handleOrientation(event) {
   //     0.01  근처  → 기준 거의 고정
   //     0.02~0.03 → 조금씩 손에 적응 (추천 시작값)
   //     0.05 이상 → 너무 빨리 따라와서 효과 줄어듦
-  const neutralFollowStrength = 0.02;
+  const neutralFollowStrength = 0.1;
   gyroBaseGamma += diffGamma * neutralFollowStrength;
   gyroBaseBeta  += diffBeta  * neutralFollowStrength;
 
@@ -1172,7 +1172,7 @@ function handleOrientation(event) {
   diffBeta  = beta  - gyroBaseBeta;
 
   // 5) 감도 설정 (나누는 값이 작을수록 더 예민해짐)
-  const nxRaw = THREE.MathUtils.clamp(diffGamma / 3, -1, 1); // 좌우
+  const nxRaw = THREE.MathUtils.clamp(diffGamma / 1, -1, 1); // 좌우
   const nyRaw = THREE.MathUtils.clamp(diffBeta  / 1, -1, 1); // 상하
 
   // 6) 원하는 방향(부호)로 뒤집기
@@ -1183,7 +1183,7 @@ function handleOrientation(event) {
 
   // 7) 부드럽게 보간해서 튐 방지
   //    smooth: 0.1 → 조금 뻣뻣, 0.2~0.3 → 꽤 부드러움
-  const smooth = 0.03;
+  const smooth = 0.01;
   gyroX = gyroX * (1 - smooth) + targetX * smooth;
   gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
