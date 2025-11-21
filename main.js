@@ -1042,6 +1042,11 @@ let useGyro = false; // true면 자이로값, false면 마우스값으로 패럴
 let baseRotationY = 0;
 let spinVelocityY = 0;
 
+// 🔧 자이로 기준점(중심 자세)용 변수
+let gyroBaseBeta = 0;    // 앞뒤 기준값
+let gyroBaseGamma = 0;   // 좌우 기준값
+let gyroCalibrated = false; // 처음 기준이 세팅되었는지 여부
+
 // ▶ 모바일 판별
 const isMobile =
   "ontouchstart" in window ||
@@ -1134,14 +1139,12 @@ window.addEventListener(
  *  자이로(기울기 센서) 세팅
  * ==========================================================================*/
 
-
-// 📌 처음 한 번은 "현재 들고 있는 자세"를 기준점으로 삼고,
-// 그 이후에는 기준점이 현재 자세 쪽으로 천천히 따라오게 하는 버전
+// 📌 자이로 입력 → 기준점이 서서히 따라오는 버전
 function handleOrientation(event) {
   const { beta, gamma } = event; // beta: 앞/뒤, gamma: 좌/우
   if (beta == null || gamma == null) return;
 
-  // 1) 최초 한 번: 지금 자세를 기준으로 저장
+  // 1) 처음 한 번: "지금 자세"를 기준으로 잡기
   if (!gyroCalibrated) {
     gyroBaseBeta = beta;
     gyroBaseGamma = gamma;
@@ -1149,111 +1152,42 @@ function handleOrientation(event) {
     console.log("✅ Gyro first calibrate:", gyroBaseBeta, gyroBaseGamma);
   }
 
-  // 2) 현재 값과 기준점의 차이(= 실제 패럴럭스에 쓸 값)
+  // 2) 현재 값과 기준값의 차이
   let diffGamma = gamma - gyroBaseGamma; // 좌우
   let diffBeta  = beta  - gyroBaseBeta;  // 상하
 
-  // 3) 기준점이 "천천히" 현재 값 쪽으로 따라오게 해서
-  //    오랫동안 들고 있는 자세가 자연스럽게 0이 되도록 만듦
+  // 3) 기준값을 천천히 현재 값 쪽으로 따라오게 해서
+  //    오래 들고 있으면 그 자세가 자연스럽게 중심이 되도록 만들기
   //
-  //    neutralFollowStrength:
-  //      - 0.0  ~ 0.01  : 기준이 거의 고정 (거의 안 따라옴)
-  //      - 0.02 ~ 0.05  : 은근히 서서히 따라옴 (추천)
-  //      - 0.1 이상     : 너무 빨리 따라와서 패럴럭스가 줄어들 수 있음
-  const neutralFollowStrength = 0.01;
+  //   neutralFollowStrength:
+  //     0.01  근처  → 기준 거의 고정
+  //     0.02~0.03 → 조금씩 손에 적응 (추천 시작값)
+  //     0.05 이상 → 너무 빨리 따라와서 효과 줄어듦
+  const neutralFollowStrength = 0.02;
   gyroBaseGamma += diffGamma * neutralFollowStrength;
   gyroBaseBeta  += diffBeta  * neutralFollowStrength;
 
-  // 4) 기준이 조금 이동했으니, 다시 한 번 차이를 구해서 실제 입력으로 사용
+  // 4) 업데이트된 기준 기준으로 다시 차이 계산
   diffGamma = gamma - gyroBaseGamma;
   diffBeta  = beta  - gyroBaseBeta;
 
-  // 5) 감도 & 정규화
-  //    나누는 숫자가 작을수록 더 예민해짐 (예: 30은 예민, 60은 둔감)
-  const nx = THREE.MathUtils.clamp(diffGamma / 35, -1, 1); // 좌우
-  const ny = THREE.MathUtils.clamp(diffBeta  / 40, -1, 1); // 상하
+  // 5) 감도 설정 (나누는 값이 작을수록 더 예민해짐)
+  const nxRaw = THREE.MathUtils.clamp(diffGamma / 40, -1, 1); // 좌우
+  const nyRaw = THREE.MathUtils.clamp(diffBeta  / 40, -1, 1); // 상하
 
-  // 6) 방향(부호) 결정
-  //    원하면 여기서 -를 빼거나, 한쪽만 -를 붙여서 상하/좌우 따로 반전 가능
-  let targetX = -nx;
-  let targetY = -ny;
+  // 6) 원하는 방향(부호)로 뒤집기
+  //   -nx, -ny로 하면 "폰 기울이는 방향과 반대로" 카메라가 움직이는 느낌
+  //    (어색하면 여기 부호만 바꾸면 됨)
+  const targetX = -nxRaw;
+  const targetY = -nyRaw;
 
-  // 7) 값 튀는 거 조금 줄이려고 부드럽게 보간
-  const smooth = 0.15; // 0에 가까울수록 뻣뻣, 1에 가까울수록 즉각
+  // 7) 부드럽게 보간해서 튐 방지
+  //    smooth: 0.1 → 조금 뻣뻣, 0.2~0.3 → 꽤 부드러움
+  const smooth = 0.15;
   gyroX = gyroX * (1 - smooth) + targetX * smooth;
   gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
 
-
-function setupGyro() {
-  const DOE = window.DeviceOrientationEvent;
-  if (!DOE) {
-    console.log("👉 DeviceOrientationEvent 미지원 브라우저");
-    return;
-  }
-
-  // https / localhost 환경 체크 (iOS는 보안 컨텍스트 아니면 센서 막힐 수 있음)
-  const isSecure =
-    location.protocol === "https:" ||
-    location.hostname === "localhost" ||
-    location.hostname === "127.0.0.1";
-
-  if (!isSecure) {
-    console.warn(
-      "⚠️ 자이로는 보통 HTTPS(또는 localhost)에서만 동작합니다. 현재 주소를 확인해 주세요."
-    );
-  }
-
-  // iOS 구형 스타일: requestPermission 필요
-  if (typeof DOE.requestPermission === "function") {
-    const btn = document.createElement("button");
-    btn.textContent = "📱 기울여서 보기";
-    btn.id = "gyroBtn";
-    btn.style.position = "fixed";
-    btn.style.top = "16px";
-    btn.style.left = "16px";
-    btn.style.zIndex = "9999";
-    btn.style.padding = "8px 12px";
-    btn.style.borderRadius = "20px";
-    btn.style.border = "none";
-    btn.style.fontSize = "12px";
-    btn.style.background = "rgba(0,0,0,0.6)";
-    btn.style.color = "#fff";
-    btn.style.backdropFilter = "blur(10px)";
-    btn.style.cursor = "pointer";
-    document.body.appendChild(btn);
-
-    btn.addEventListener("click", async () => {
-      try {
-        const state = await DOE.requestPermission();
-        console.log("gyro permission:", state);
-        if (state === "granted") {
-          useGyro = true;
-          window.addEventListener("deviceorientation", handleOrientation, true);
-          btn.textContent = "📱 기울여서 보기 ON ✅";
-          setTimeout(() => btn.remove(), 1500);
-        } else {
-          alert(
-            "자이로 접근이 거부되었습니다.\n설정 > Safari > 모션 및 방향 접근을 확인해 주세요."
-          );
-        }
-      } catch (err) {
-        console.error("gyro permission error", err);
-        alert("자이로 권한 요청 중 오류가 발생했습니다.");
-      }
-    });
-  } else {
-    // requestPermission 없는 환경 (안드로이드 / 최신 브라우저)
-    useGyro = true;
-    window.addEventListener("deviceorientation", handleOrientation, true);
-    console.log("🔓 requestPermission 없음 → 바로 자이로 사용 시도");
-  }
-}
-
-// 모바일에서만 자이로 세팅 시도
-if (isMobile) {
-  setupGyro();
-}
 
 /* ============================================================================
  *  리사이즈 & 줌
