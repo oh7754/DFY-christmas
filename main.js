@@ -365,6 +365,8 @@ if (polaroidFrameBtn) {
 }
 
 
+
+
 /* ============================================================================
  *  상단 프로필 & 사이드 패널
  * ==========================================================================*/
@@ -519,19 +521,29 @@ function closeWishModal() {
 if (openWishModalBtn) {
   openWishModalBtn.addEventListener("click", openWishModal);
 }
+
+// ✉️ 소원 작성 모달 닫기(X 버튼)
 if (wishCancelBtn) {
   wishCancelBtn.addEventListener("click", closeWishModal);
 }
+
+// ✉️ 소원 작성 모달 - 편지 밖(블러 영역) 클릭 시 닫기
 if (wishModal) {
   wishModal.addEventListener("click", (e) => {
-    if (
-      e.target === wishModal ||
-      e.target.classList.contains("modal-backdrop")
-    ) {
+    // 편지 카드 요소가 없으면 그냥 닫기
+    if (!wishLetter) {
+      closeWishModal();
+      return;
+    }
+
+    // 클릭한 타겟이 편지 영역 안에 없으면 = 바깥(블러/백드롭) 클릭
+    if (!wishLetter.contains(e.target)) {
       closeWishModal();
     }
+    // 편지 안쪽 클릭은 유지
   });
 }
+
 
 /* ============================================================================
  *  캔버스 텍스처 (글로우 / 눈 입자)
@@ -1759,25 +1771,20 @@ if (wishCloseBtn) {
   wishCloseBtn.addEventListener("click", closeWishPanelPanelOnly);
 }
 
+// 편지 밖(블러/주변 영역)을 클릭하면 닫히도록
 if (wishPanel) {
   wishPanel.addEventListener("click", (e) => {
-    // wishPanel 자체나 .modal-backdrop 을 눌렀을 때만 닫기
-    if (
-      e.target === wishPanel ||
-      e.target.classList.contains("modal-backdrop")
-    ) {
+    // 편지 카드 요소가 없으면 그냥 닫기
+    if (!wishViewLetter) {
       closeWishPanelPanelOnly();
+      return;
     }
-  });
-}
 
-// 편지 밖(블러 영역)을 클릭해도 닫히도록
-if (wishPanel) {
-  wishPanel.addEventListener("click", (e) => {
-    // wishPanel 자체나 .modal-backdrop 을 눌렀을 때만 닫기
-    if (e.target === wishPanel || e.target.classList.contains("modal-backdrop")) {
+    // 클릭된 타겟이 편지 카드 안에 "포함되지 않으면" = 바깥 영역 클릭
+    if (!wishViewLetter.contains(e.target)) {
       closeWishPanelPanelOnly();
     }
+    // 편지 카드 안쪽을 클릭하면 아무 일도 안 일어나고 그대로 유지
   });
 }
 

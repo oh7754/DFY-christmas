@@ -820,7 +820,7 @@ canvas {
   position: relative;
   display: flex;
   justify-content: center;
-  margin-top: 6%;
+  margin-top: 0%;
   gap: 8px;
 }
 
@@ -850,7 +850,7 @@ canvas {
 .wish-privacy-toggle:hover,
 .wish-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  /* box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35); */
 }
 
 /* 개별 스타일 */
