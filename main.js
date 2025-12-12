@@ -2,11 +2,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-// ★ postprocessing: DOF용 BokehPass만 사용 (Bloom X)
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
-
 // ===== Firebase CDN imports =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 import {
@@ -19,6 +14,9 @@ import {
   serverTimestamp,
   deleteDoc,
   doc,
+  setDoc,
+  getDoc,
+  runTransaction,
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 import {
   getStorage,
@@ -82,12 +80,105 @@ const wishNameInput = document.getElementById("wishNameInput");
 const wishTextInput = document.getElementById("wishTextInput");
 const wishCancelBtn = document.getElementById("wishCancelBtn");
 const wishSubmitBtn = document.getElementById("wishSubmitBtn");
+const wishNameField = document.querySelector(".wish-name-field");
+const wishPrivacyToggle = document.getElementById("wishPrivacyToggle");
 
 // 편지 패널
 const wishPanel = document.getElementById("wishPanel");
 const wishSenderEl = document.getElementById("wishSender");
 const wishContentEl = document.getElementById("wishContent");
 const wishCloseBtn = document.getElementById("wishCloseBtn");
+const wishViewImageEl = document.getElementById("wishViewImage");
+// 작성용/열람용 편지지
+const wishLetter = document.querySelector(".wish-letter");
+const wishViewLetter = document.querySelector(".wish-view-letter");
+
+// ❤️ 좋아요 버튼 / 카운트
+const wishLikeBtn = document.getElementById("wishLikeBtn");
+const wishLikeCountEl = document.getElementById("wishLikeCount");
+
+// 드롭존
+const dropzone = document.getElementById("wishImageDropzone");
+const dropPreview = dropzone
+  ? dropzone.querySelector(".wish-image-preview")
+  : null;
+
+// 폴라로이드 프레임 / 토글 버튼
+const polaroidFrameBtn = document.getElementById("polaroidFrameBtn");
+
+// 작성 영역 안의 폴라로이드 이미지
+const frameOverlayWrite = document.querySelector(
+  "#wishDropzoneTransform .wish-image-frame"
+);
+
+// 보기(소원 패널) 안의 폴라로이드 이미지
+const frameOverlayView = document.querySelector(
+  "#wishViewImageTransform .wish-image-frame"
+);
+
+
+/* ============================================================================
+ *  소원 이름 인풋: 폭 자동 리사이즈 + 익명 빗금 길이 연동
+ * ==========================================================================*/
+
+const wishNameSizer = document.createElement("span");
+wishNameSizer.style.position = "fixed";
+wishNameSizer.style.left = "-9999px";
+wishNameSizer.style.top = "-9999px";
+wishNameSizer.style.visibility = "hidden";
+wishNameSizer.style.whiteSpace = "pre";
+document.body.appendChild(wishNameSizer);
+
+let wishNameMinWidth = 0;
+
+function initWishNameMinWidth() {
+  if (!wishNameInput) return;
+
+  const style = getComputedStyle(wishNameInput);
+  wishNameSizer.style.font = style.font;
+  wishNameSizer.style.letterSpacing = style.letterSpacing;
+
+  wishNameSizer.textContent = "가가가";
+  wishNameMinWidth = wishNameSizer.getBoundingClientRect().width;
+}
+
+function updateAnonLineWidth() {
+  if (!wishNameField || !wishNameInput) return;
+  const w = wishNameInput.offsetWidth || 0;
+  wishNameField.style.setProperty("--anon-line-width", w + "px");
+}
+
+function resizeWishNameInput() {
+  if (!wishNameInput) return;
+
+  const style = getComputedStyle(wishNameInput);
+  wishNameSizer.style.font = style.font;
+  wishNameSizer.style.letterSpacing = style.letterSpacing;
+
+  let displayText;
+
+  if (wishNameInput.value && wishNameInput.value.length > 0) {
+    displayText = wishNameInput.value;
+  } else {
+    displayText = wishNameInput.placeholder || " ";
+  }
+
+  wishNameSizer.textContent = displayText;
+
+  const width = wishNameSizer.getBoundingClientRect().width;
+  const baseMin = wishNameMinWidth || width;
+  const finalWidth = Math.max(width, baseMin);
+
+  wishNameInput.style.width = finalWidth + "px";
+
+  updateAnonLineWidth();
+}
+
+if (wishNameInput) {
+  initWishNameMinWidth();
+  resizeWishNameInput();
+  wishNameInput.addEventListener("input", resizeWishNameInput);
+}
 
 /* ============================================================================
  *  상태
@@ -97,13 +188,26 @@ let currentUser = null;
 let lastSnapshot = null;
 const shownImageIds = new Set();
 
+// 현재 열려 있는 소원 문서 id (좋아요/뷰용)
+let currentOpenedWishId = null;
+
+// 익명 여부 (토글 버튼으로 관리)
+let isAnonymousState = false;
+
+// 폴라로이드 프레임 사용 여부 (작성 시 기준)
+let isPolaroidOn = true;
+
+
 // 트리 이미지 mesh → 데이터 매핑 (클릭용)
 const imageMeshes = [];
 const meshToData = new Map();
 
-// 🌲 가지에 매달린 카드 피직스용 (중력 펜듈럼)
-// { hanger, axis, angle, vel, stiffness, damping }
+// 가지에 매달린 카드 피직스용
 const hangingObjects = [];
+
+// 트리에 걸린 카드 위치들 (겹침 방지용)
+const cardPositions = [];
+
 
 /* ============================================================================
  *  유틸 함수
@@ -134,6 +238,23 @@ function formatDate(ts) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);
+}
+
+// DB 데이터 기준 발신자 텍스트
+function formatWishSender(data) {
+  if (data.isAnonymous) return "비밀 소원";
+
+  const raw = (data.wishName || "").trim();
+
+  if (!raw) {
+    return data.ownerEmail || "익명";
+  }
+
+  if (raw.endsWith("의 소원")) {
+    return raw;
+  }
+
+  return `${raw}의 소원`;
 }
 
 /* ============================================================================
@@ -171,6 +292,78 @@ onAuthStateChanged(auth, async (user) => {
 
   renderMyWishes();
 });
+
+/* ============================================================================
+ *  소원 작성 – 이미지 드롭존/클릭 업로드
+ * ==========================================================================*/
+
+if (dropzone) {
+  dropzone.addEventListener("click", () => {
+    if (!wishFileInput) return;
+    wishFileInput.click();
+  });
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    wishFileInput.files = dt.files;
+
+    setDropzoneFile(file);
+  });
+}
+
+if (wishFileInput) {
+  wishFileInput.addEventListener("change", () => {
+    const file = wishFileInput.files[0];
+    if (!file) return;
+    setDropzoneFile(file);
+  });
+}
+
+function setDropzoneFile(file) {
+  if (!file || !dropPreview || !dropzone) return;
+
+  const url = URL.createObjectURL(file);
+  dropPreview.style.backgroundImage = `url(${url})`;
+  dropzone.classList.add("has-image");
+}
+
+function updatePolaroidWriteUI() {
+  // 작성 모달 안 프레임 숨기기 / 보이기
+  if (frameOverlayWrite) {
+    frameOverlayWrite.classList.toggle("frame-off", !isPolaroidOn);
+  }
+
+  // 버튼 텍스트도 상태에 따라 변경 (원하는 문구로 바꿔도 됨)
+  if (polaroidFrameBtn) {
+    polaroidFrameBtn.textContent = isPolaroidOn ? "프레임 끄기" : "프레임 켜기";
+  }
+}
+
+if (polaroidFrameBtn) {
+  polaroidFrameBtn.addEventListener("click", () => {
+    isPolaroidOn = !isPolaroidOn;
+    updatePolaroidWriteUI();
+  });
+}
+
 
 /* ============================================================================
  *  상단 프로필 & 사이드 패널
@@ -222,37 +415,125 @@ if (topAccount) {
 }
 
 /* ============================================================================
- *  소원 업로드 모달
+ *  소원 업로드 모달 (열기 / 닫기 / 이름 자동완성 / 익명 스타일)
  * ==========================================================================*/
+
+function setPrivacyUI(isAnonymous) {
+  isAnonymousState = isAnonymous;
+
+  if (!wishNameField) return;
+
+  wishNameField.classList.toggle("is-anonymous", isAnonymous);
+
+  if (wishPrivacyToggle) {
+    wishPrivacyToggle.textContent = isAnonymous ? "별명공개" : "비밀소원";
+  }
+
+  updateAnonLineWidth();
+}
+
+if (wishPrivacyToggle && wishNameField) {
+  wishPrivacyToggle.addEventListener("click", () => {
+    setPrivacyUI(!isAnonymousState);
+  });
+}
 
 function openWishModal() {
   if (!currentUser) {
     alert("먼저 사내 구글 계정으로 로그인 해주세요.");
     return;
   }
-  wishModal.classList.remove("hidden");
+
+  const rawName =
+    (currentUser.displayName && currentUser.displayName.trim()) ||
+    (currentUser.email ? currentUser.email.split("@")[0] : "");
+
+  if (wishNameInput) {
+    wishNameInput.disabled = false;
+    wishNameInput.classList.remove("wish-input-disabled");
+    wishNameInput.value = rawName || "";
+    resizeWishNameInput();
+  }
+
+  setPrivacyUI(false);
+
+  // ✅ 새 소원 작성할 땐 기본으로 프레임 ON
+  isPolaroidOn = false;
+  updatePolaroidWriteUI();
+
+  if (wishTextInput) wishTextInput.value = "";
+  if (wishFileInput) wishFileInput.value = "";
+  if (dropzone) dropzone.classList.remove("has-image");
+  if (dropPreview) dropPreview.style.backgroundImage = "";
+
+
+  if (wishModal) {
+    wishModal.classList.remove("hidden");
+  }
+
+  if (wishLetter) {
+    wishLetter.classList.remove("is-closing");
+    requestAnimationFrame(() => {
+      wishLetter.classList.add("is-open");
+    });
+  }
 }
 
 function closeWishModal() {
-  wishModal.classList.add("hidden");
-  wishFileInput.value = "";
-  wishTextInput.value = "";
+  if (!wishModal) return;
+
+  const finishClose = () => {
+    wishModal.classList.add("hidden");
+
+    if (wishTextInput) wishTextInput.value = "";
+    if (wishFileInput) wishFileInput.value = "";
+    if (dropzone) dropzone.classList.remove("has-image");
+    if (dropPreview) dropPreview.style.backgroundImage = "";
+
+    if (wishLetter) {
+      wishLetter.classList.remove("is-closing");
+      wishLetter.classList.remove("is-open");
+    }
+  };
+
+  if (!wishLetter) {
+    finishClose();
+    return;
+  }
+
+  wishLetter.classList.remove("is-open");
+  wishLetter.classList.add("is-closing");
+
+  const onTransitionEnd = (e) => {
+    if (e.target !== wishLetter) return;
+    wishLetter.removeEventListener("transitionend", onTransitionEnd);
+    finishClose();
+  };
+
+  wishLetter.addEventListener("transitionend", onTransitionEnd);
 }
 
-openWishModalBtn.addEventListener("click", openWishModal);
-wishCancelBtn.addEventListener("click", closeWishModal);
-
-wishModal.addEventListener("click", (e) => {
-  if (e.target === wishModal || e.target.classList.contains("modal-backdrop")) {
-    closeWishModal();
-  }
-});
+if (openWishModalBtn) {
+  openWishModalBtn.addEventListener("click", openWishModal);
+}
+if (wishCancelBtn) {
+  wishCancelBtn.addEventListener("click", closeWishModal);
+}
+if (wishModal) {
+  wishModal.addEventListener("click", (e) => {
+    if (
+      e.target === wishModal ||
+      e.target.classList.contains("modal-backdrop")
+    ) {
+      closeWishModal();
+    }
+  });
+}
 
 /* ============================================================================
  *  캔버스 텍스처 (글로우 / 눈 입자)
  * ==========================================================================*/
 
-// 🔆 라이트 글로우용 캔버스 텍스처
 function createGlowTexture() {
   const size = 128;
   const canvas = document.createElement("canvas");
@@ -281,7 +562,6 @@ function createGlowTexture() {
 
 const glowTexture = createGlowTexture();
 
-// ❄️ 눈 입자용 동그라미 텍스처
 function createSnowParticleTexture(size = 64) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
@@ -304,18 +584,18 @@ function createSnowParticleTexture(size = 64) {
 }
 
 /* ============================================================================
- *  THREE.js 씬 / 렌더러 / 포스트프로세싱
+ *  THREE.js 씬 / 렌더러 + 텍스처 로더 & 컬러맵
  * ==========================================================================*/
 
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
-  45,
+  32,
   window.innerWidth / window.innerHeight,
-  0.1,
-  1000
+  1,
+  100
 );
-camera.position.set(0, 6, 18);
+camera.position.set(0, 12, 24);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -331,56 +611,154 @@ renderer.toneMappingExposure = 1.0;
 renderer.setClearColor(0x000110);
 document.body.appendChild(renderer.domElement);
 
-// 🔧 포스트프로세싱
-const composer = new EffectComposer(renderer);
-const renderPass = new RenderPass(scene, camera);
-composer.addPass(renderPass);
+// 🔄 전역 텍스처 로더
+const textureLoader = new THREE.TextureLoader();
 
-const bokehParams = {
-  focus: 0.0,
-  aperture: 0.0,
-  maxblur: 0.0,
-  width: window.innerWidth,
-  height: window.innerHeight,
-};
-const bokehPass = new BokehPass(scene, camera, bokehParams);
-composer.addPass(bokehPass);
+// ▸ 트리 노말맵 / 눈 노말맵
+const treeNormalMap = textureLoader.load(
+  "source/christmas-tree_BumpNormals.png"
+);
 
-// 트리 루트 그룹
-const treeGroup = new THREE.Group();
-scene.add(treeGroup);
+// ▸ 폴라로이드 프레임 텍스처 (트리용)
+const polaroidTexture = textureLoader.load("source/polaroid.png");
+polaroidTexture.colorSpace = THREE.SRGBColorSpace;
+polaroidTexture.flipY = true;
 
-/* ============================================================================
- *  바닥
- * ==========================================================================*/
-
-const groundGeo = new THREE.CircleGeometry(18, 64);
-const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x000110,
-  metalness: 0.2,
-  roughness: 0.9,
+const POLAROID_FRAME_SCALE = 1.56; // 카드보다 조금 크게
+const polaroidFrameMaterial = new THREE.MeshBasicMaterial({
+  map: polaroidTexture,
+  transparent: true,
+  side: THREE.DoubleSide,
 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = 0;
-ground.receiveShadow = true;
-scene.add(ground);
+
+treeNormalMap.colorSpace = THREE.NoColorSpace;
+treeNormalMap.flipY = false;
+
+const treeSnowNormalMap = textureLoader.load(
+  "source/christmas-tree_snow_BumpNormals.png"
+);
+treeSnowNormalMap.colorSpace = THREE.NoColorSpace;
+treeSnowNormalMap.flipY = false;
+
+// ▸ 월드 컬러맵
+const worldColorMap = textureLoader.load("source/world_Color.png");
+worldColorMap.colorSpace = THREE.SRGBColorSpace;
+worldColorMap.flipY = false;
+
+// ▸ 월드 범프맵
+const worldBumpMap = textureLoader.load("source/world_Bump.png");
+worldBumpMap.colorSpace = THREE.NoColorSpace;
+worldBumpMap.flipY = false;
 
 /* ============================================================================
- *  조명
+ *  바닥 (World)
  * ==========================================================================*/
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x223355, 0.4);
-hemiLight.position.set(0, 1, 0);
+let worldModel = null;
+
+// POST 레이어 메쉬들 & hover 상태
+const postMeshes = [];
+let hoveredPost = null;
+
+function setPostHoverTarget(mesh, isHover) {
+  if (!mesh) return;
+  if (!mesh.userData) mesh.userData = {};
+  mesh.userData.hoverTarget = isHover ? 1 : 0;
+}
+
+const worldLoader = new GLTFLoader();
+worldLoader.load(
+  "source/world.gltf",
+  (gltf) => {
+    worldModel = gltf.scene;
+    worldModel.position.set(0, 0, 0);
+    worldModel.scale.set(0.8, 0.8, 0.8);
+
+    applyWorldTextures(worldModel);
+
+    scene.add(worldModel);
+    console.log("✅ world.glb 로드 완료 (컬러맵)");
+  },
+  undefined,
+  (error) => {
+    console.error("world.glb 로드 실패:", error);
+  }
+);
+
+// 월드 안에서 이름에 "POST"가 들어가는 오브젝트인지 검사
+function isPostMesh(obj) {
+  let node = obj;
+  while (node) {
+    const name = (node.name || "").toLowerCase();
+    if (name === "post" || name.includes("post")) {
+      return true;
+    }
+    node = node.parent;
+  }
+  return false;
+}
+
+// world.gltf 메쉬들에 컬러맵/범프 적용 + POST 전용 설정
+function applyWorldTextures(root) {
+  root.traverse((obj) => {
+    if (!obj.isMesh || !obj.geometry) return;
+
+    // 🔶 POST 레이어
+    if (isPostMesh(obj)) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xE8D9C5, // 원하는 기본 색
+        metalness: 0.8,
+        roughness: 0.3,
+        emissive: 0xE8D9C5,
+        emissiveIntensity: 0.3,
+      });
+
+      obj.material = mat;
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+
+      obj.userData.basePosition = obj.position.clone();
+      obj.userData.hoverState = 0;
+      obj.userData.hoverTarget = 0;
+
+      postMeshes.push(obj);
+      return;
+    }
+
+    // 🌍 나머지 월드
+    const mat = new THREE.MeshStandardMaterial({
+      map: worldColorMap,
+      bumpMap: worldBumpMap,
+      bumpScale: 0.08,
+      metalness: 0.5,
+      roughness: 1.0,
+    });
+
+    obj.material = mat;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+  });
+}
+
+/* ============================================================================
+ *  조명 (환경광 + 메인 스포트라이트 + 보조)
+ * ==========================================================================*/
+
+const hemiLight = new THREE.HemisphereLight(
+  0xffffff,
+  0x0045cf,
+  0.2
+);
+hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const spotLight = new THREE.SpotLight(
-  0xffffff,
-  4.0,
-  60,
-  Math.PI / 2.5,
-  1.0,
-  4.0
+  0xffe7e9,
+  1,
+  50,
+  Math.PI / 6,
+  1,
+  3
 );
 spotLight.castShadow = true;
 spotLight.shadow.mapSize.set(1024, 1024);
@@ -388,18 +766,65 @@ spotLight.shadow.camera.near = 5;
 spotLight.shadow.camera.far = 60;
 spotLight.shadow.bias = -0.0001;
 spotLight.shadow.normalBias = 0.01;
-spotLight.position.set(0, 20, 0);
-spotLight.target.position.set(0, 10, 0);
+spotLight.position.set(0, 15, 0);
+spotLight.target.position.set(0, 0, 0);
 scene.add(spotLight);
 scene.add(spotLight.target);
 
+const spotLight2 = new THREE.SpotLight(
+  0xffe7e9,
+  2,             // ← 여긴 그냥 두고
+  50,
+  Math.PI / 14,
+  1,
+  3
+);
+spotLight2.castShadow = true;
+spotLight2.shadow.mapSize.set(512, 512);
+spotLight2.shadow.camera.near = 5;
+spotLight2.shadow.camera.far = 60;
+spotLight2.shadow.bias = -0.0001;
+spotLight2.shadow.normalBias = 0.01;
+spotLight2.position.set(-6, 18, 4);
+spotLight2.target.position.set(-6, 0, 4);
+scene.add(spotLight2);
+scene.add(spotLight2.target);
+
+// 🔹 기본은 어둡게 시작
+spotLight2.intensity = 0.5;
+
+// 포인트 라이트 (POST 근처)
+const postLight = new THREE.PointLight(0xffea94, 1, 10);
+postLight.castShadow = false;
+postLight.position.set(-7, 4, 2.8);
+scene.add(postLight);
+
+// 🔹 기본 세기는 살짝만
+postLight.intensity = 0.3;
+
+// 라이트 위치 표시용 구체
+const postLightMarkerGeo = new THREE.SphereGeometry(0.2, 16, 16);
+const postLightMarkerMat = new THREE.MeshBasicMaterial({
+  color: 0xffea94,
+});
+const postLightMarker = new THREE.Mesh(
+  postLightMarkerGeo,
+  postLightMarkerMat
+);
+postLight.add(postLightMarker);
+postLightMarker.position.set(0, 0, 0);
+
 /* ============================================================================
- *  트리 & 레이어 셰이딩
+ *  트리 & 레이어 셰이딩 (Star / Tree / Trunk / Snow)
  * ==========================================================================*/
 
-const treeHeight = 9;
+const treeHeight = 8;
 const treeRadius = 3.6;
-const TREE_CENTER_Y = 0.75 + treeHeight / 2;
+const TREE_CENTER_Y =1.7 + treeHeight / 2;
+
+// 굳이 window에 올릴 필요 없이 그냥 로컬 그룹 하나 생성
+const treeGroup = new THREE.Group();
+scene.add(treeGroup);
 
 const tree = new THREE.Object3D();
 tree.position.y = TREE_CENTER_Y;
@@ -409,28 +834,65 @@ const star = new THREE.Object3D();
 star.position.y = TREE_CENTER_Y + treeHeight / 2 + 0.8;
 treeGroup.add(star);
 
+
+// 디버그용 소원 영역 콘
+const SHOW_WISH_CONE = true;
+if (SHOW_WISH_CONE) {
+  const coneGeom = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
+  const coneEdges = new THREE.EdgesGeometry(coneGeom);
+  const coneLines = new THREE.LineSegments(
+    coneEdges,
+    new THREE.LineBasicMaterial({
+      color: 0x22c55e,
+      transparent: true,
+      opacity: 10,
+    })
+  );
+
+  const wishConeHelper = new THREE.Object3D();
+  wishConeHelper.position.y = TREE_CENTER_Y;
+  wishConeHelper.add(coneLines);
+  treeGroup.add(wishConeHelper);
+}
+
+// 레이어별 머티리얼
 const treeLayerMaterials = {
   star: new THREE.MeshStandardMaterial({
     vertexColors: true,
     metalness: 1,
     roughness: 0.4,
     emissive: 0xffb60c,
-    emissiveIntensity: 0.4,
+    emissiveIntensity: 0.1,
+    bumpMap: treeNormalMap,
+    bumpScale: 0.05,
   }),
   foliage: new THREE.MeshStandardMaterial({
     vertexColors: true,
-    metalness: 0.2,
+    metalness: 0.3,
     roughness: 0.5,
+    bumpMap: treeNormalMap,
+    bumpScale: 0.05,
   }),
   trunk: new THREE.MeshStandardMaterial({
     vertexColors: true,
     metalness: 0.4,
     roughness: 0.7,
+    bumpMap: treeNormalMap,
+    bumpScale: 0.04,
+  }),
+  snow: new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.1,
+    roughness: 0.8,
+    bumpMap: treeSnowNormalMap,
+    bumpScale: 0.08,
   }),
   other: new THREE.MeshStandardMaterial({
     vertexColors: true,
     metalness: 0.3,
     roughness: 0.4,
+    bumpMap: treeNormalMap,
+    bumpScale: 0.05,
   }),
 };
 window.treeLayerMaterials = treeLayerMaterials;
@@ -439,7 +901,7 @@ const loader = new GLTFLoader();
 let treeModel = null;
 
 loader.load(
-  "source/christmas-tree.glb",
+  "source/christmas-tree.gltf",
   (gltf) => {
     treeModel = gltf.scene;
     treeModel.position.set(0, 0, 0);
@@ -458,20 +920,26 @@ loader.load(
 function getLayerIdFromHierarchy(obj) {
   let node = obj;
   while (node) {
-    if (node.name && node.name.match(/^\d{2}$/)) {
-      return node.name;
-    }
+    const name = (node.name || "").toLowerCase();
+    if (name === "star") return "Star";
+    if (name === "tree") return "Tree";
+    if (name === "trunk") return "Trunk";
+    if (name === "snow") return "Snow";
     node = node.parent;
   }
   return null;
 }
 
+// 버텍스 컬러 그라디언트 + 레이어 컬러
 function applyLayerShading(root) {
   const greenTop = new THREE.Color(0x003937);
   const greenBottom = new THREE.Color(0x3fac00);
 
   const brownTop = new THREE.Color(0x5f4000);
   const brownBottom = new THREE.Color(0x2b0800);
+
+  const snowTop = new THREE.Color(0xffffff);
+  const snowBottom = new THREE.Color(0xdbeafe);
 
   const starColor = new THREE.Color(0xffb60c);
 
@@ -503,12 +971,14 @@ function applyLayerShading(root) {
       const y = pos.getY(i);
       const tBottom = (y - minY) / height;
 
-      if (layerId === "01") {
+      if (layerId === "Star") {
         color.copy(starColor);
-      } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
+      } else if (layerId === "Tree") {
         color.copy(greenBottom).lerp(greenTop, tBottom);
-      } else if (layerId === "08") {
+      } else if (layerId === "Trunk") {
         color.copy(brownBottom).lerp(brownTop, tBottom);
+      } else if (layerId === "Snow") {
+        color.copy(snowBottom).lerp(snowTop, tBottom);
       } else {
         color.set(0xffffff);
       }
@@ -522,13 +992,10 @@ function applyLayerShading(root) {
     obj.geometry = geo;
 
     let matKey = "other";
-    if (layerId === "01") {
-      matKey = "star";
-    } else if (Number(layerId) >= 2 && Number(layerId) <= 7) {
-      matKey = "foliage";
-    } else if (layerId === "08") {
-      matKey = "trunk";
-    }
+    if (layerId === "Star") matKey = "star";
+    else if (layerId === "Tree") matKey = "foliage";
+    else if (layerId === "Trunk") matKey = "trunk";
+    else if (layerId === "Snow") matKey = "snow";
 
     const mat = treeLayerMaterials[matKey];
 
@@ -544,11 +1011,11 @@ function applyLayerShading(root) {
 }
 
 /* ============================================================================
- *  트리 주변 도는 라이트들
+ *  트리 주변 도는 라이트들 (현재 0)
  * ==========================================================================*/
 
-const LIGHT_COUNT = 15;
-const ORBIT_INNER_RADIUS = 5;
+const LIGHT_COUNT = 10;
+const ORBIT_INNER_RADIUS = 4;
 const ORBIT_OUTER_RADIUS = 9;
 
 const lightSphereGeo = new THREE.SphereGeometry(0.02, 10, 10);
@@ -557,7 +1024,7 @@ const tmpColor = new THREE.Color();
 
 for (let i = 0; i < LIGHT_COUNT; i++) {
   const hue = Math.random();
-  tmpColor.setHSL(hue, 0.85, 0.6);
+  tmpColor.setHSL(hue, 1, 0.6);
 
   const light = new THREE.PointLight(tmpColor.clone(), 2.0, 10);
 
@@ -585,7 +1052,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
   const sphereMat = new THREE.MeshStandardMaterial({
     color: tmpColor.clone(),
     emissive: tmpColor.clone(),
-    emissiveIntensity: 0.8,
+    emissiveIntensity: 0.5,
     metalness: 0.0,
     roughness: 0.3,
     toneMapped: false,
@@ -617,13 +1084,20 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
  *  눈 파티클
  * ==========================================================================*/
 
-const snowCount = 600;
+const snowCount = 500;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
+// ❗ 각 눈 파티클마다 떨어지는 속도 따로 저장
+const snowVelocities = new Float32Array(snowCount);
+
 for (let i = 0; i < snowCount; i++) {
-  snowPositions[i * 3 + 0] = (Math.random() - 0.5) * 40;
-  snowPositions[i * 3 + 1] = Math.random() * 20 + 2;
-  snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+  const i3 = i * 3;
+  snowPositions[i3]     = (Math.random() - 0.5) * 40; // x
+  snowPositions[i3 + 1] = Math.random() * 20 + 2;     // y
+  snowPositions[i3 + 2] = (Math.random() - 0.5) * 40; // z
+
+  // 0.5 ~ 0.8 사이 아무 값
+  snowVelocities[i] = 0.5 + Math.random() * 0.3;
 }
 snowGeo.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
 
@@ -631,7 +1105,8 @@ const snowTexture = createSnowParticleTexture();
 const snowMat = new THREE.PointsMaterial({
   map: snowTexture,
   color: 0xffffff,
-  size: 0.14,
+  size: 0.3,
+  opacity:0.7,
   transparent: true,
   depthWrite: false,
   blending: THREE.NormalBlending,
@@ -640,79 +1115,177 @@ const snowMat = new THREE.PointsMaterial({
 const snow = new THREE.Points(snowGeo, snowMat);
 scene.add(snow);
 
+
 /* ============================================================================
  *  트리에 이미지(소원 카드) 추가 - 중력 펜듈럼
  * ==========================================================================*/
 
 function getRandomPositionOnTree() {
-  const yMin = tree.position.y - treeHeight / 2 + 0.5;
-  const yMax = tree.position.y + treeHeight / 2 - 0.5;
-  const y = yMin + Math.random() * (yMax - yMin);
-  const normalizedHeight =
-    (y - (tree.position.y - treeHeight / 2)) / treeHeight;
-  const radiusAtY = treeRadius * (1 - normalizedHeight) + 0.2;
+  const maxAttempts = 25;    // 최대 시도 횟수
+  const minDist = 1.4;       // 카드끼리 최소 거리
 
-  const angle = Math.random() * Math.PI * 2;
-  const x = Math.cos(angle) * radiusAtY;
-  const z = Math.sin(angle) * radiusAtY;
+  // 트리 바닥 / 꼭대기 기준
+  const yBottom = tree.position.y - treeHeight / 2;
+  const yTop    = tree.position.y + treeHeight / 2;
 
-  return new THREE.Vector3(x, y, z);
+  // 🔹 높이 비율 범위 (0 = 바닥, 1 = 꼭대기)
+  const minN = 0.1;   // 바닥에서 60% 위
+  const maxN = 0.96;  // 꼭대기 바로 아래
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // [minN, maxN] 사이에서 랜덤 높이 비율 선택
+    const t = minN + Math.random() * (maxN - minN);
+    const y = yBottom + treeHeight * t;
+
+    // 높이에 따른 원뿔 반지름 (위로 갈수록 가늘어짐)
+    const radiusAtY = treeRadius * (1 - t) + 0.2;
+
+    const angle = Math.random() * Math.PI * 2;
+    const x = Math.cos(angle) * radiusAtY;
+    const z = Math.sin(angle) * radiusAtY;
+
+    const candidate = new THREE.Vector3(x, y, z);
+
+    // 🔹 이미 있는 카드들과 거리 체크
+    let ok = true;
+    for (const p of cardPositions) {
+      if (candidate.distanceToSquared(p) < minDist * minDist) {
+        ok = false;
+        break;
+      }
+    }
+
+    if (ok || attempt === maxAttempts - 1) {
+      return candidate;
+    }
+  }
 }
 
+
+
 function addImageToTree(docId, data) {
-  const texLoader = new THREE.TextureLoader();
-  texLoader.load(
+  textureLoader.load(
     data.url,
     (texture) => {
-      const aspect = texture.image.width / texture.image.height;
-      const baseHeight = 1.0;
-      const width = baseHeight * aspect;
-      const height = baseHeight;
+      // 1. 이미지 원본 비율
+      const imgW = texture.image.width || 1;
+      const imgH = texture.image.height || 1;
+      const imgAspect = imgW / imgH;
 
-      const geo = new THREE.PlaneGeometry(width, height);
+      // 2. 우리가 만들 카드 프레임은 정사각형이라고 가정 (1:1)
+      const planeAspect = 1; // 정사각형
+
+      // 3. geometry도 정사각형으로 (폴라로이드 프레임과 맞추기용)
+      const size = 1.0;              // 기본 한 변 길이
+      const geo = new THREE.PlaneGeometry(size, size);
+
+      // 4. CSS의 background-size: cover + center 와 같은 효과
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+
+      texture.repeat.set(1, 1);
+      texture.offset.set(0, 0);
+
+      if (imgAspect > planeAspect) {
+        // 가로가 더 긴 이미지 → 좌/우를 잘라냄
+        const scaleX = planeAspect / imgAspect;   // 0~1
+        texture.repeat.set(scaleX, 1);
+        texture.offset.set((1 - scaleX) * 0.5, 0); // 중앙 정렬
+      } else if (imgAspect < planeAspect) {
+        // 세로가 더 긴 이미지 → 위/아래를 잘라냄
+        const scaleY = imgAspect / planeAspect;   // 0~1
+        texture.repeat.set(1, scaleY);
+        texture.offset.set(0, (1 - scaleY) * 0.5); // 중앙 정렬
+      }
+      texture.needsUpdate = true;
+
+      // 5. 머티리얼 & 메쉬 생성
       const mat = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
         side: THREE.DoubleSide,
       });
       const plane = new THREE.Mesh(geo, mat);
+      plane.renderOrder = 1; // (폴라로이드 프레임이 2)
 
       const pos = getRandomPositionOnTree();
+      cardPositions.push(pos);           // 🔹 겹침 방지용으로 위치 저장
 
       const hanger = new THREE.Object3D();
       hanger.position.copy(pos);
       treeGroup.add(hanger);
 
-      const hangLength = height * 0.5;
-      plane.position.set(0, -hangLength, 0);
-      hanger.add(plane);
+      plane.userData.cardPos = pos;
+
+      // ✅ 카드 그룹 (이미지 + 폴라로이드 프레임 묶어서 회전)
+      const cardGroup = new THREE.Object3D();
+      const hangLength = size * 0.5;
+      cardGroup.position.set(0, -hangLength, 0);
+      hanger.add(cardGroup);
+
+      cardGroup.add(plane);
+
+      // ✅ 이 소원이 폴라로이드를 쓴 경우에만 프레임 추가
+      const useFrame = data.usePolaroidFrame !== false;
+      if (useFrame && polaroidFrameMaterial) {
+        const frameGeo = new THREE.PlaneGeometry(
+          size * POLAROID_FRAME_SCALE,
+          size * POLAROID_FRAME_SCALE
+        );
+        const frameMesh = new THREE.Mesh(frameGeo, polaroidFrameMaterial);
+        frameMesh.position.set(0, -0.1, 0.01); // 이미지보다 살짝 앞
+        frameMesh.renderOrder = 2;          // ✅ 프레임은 항상 이미지보다 위에
+        cardGroup.add(frameMesh);
+      }
 
       const worldPos = new THREE.Vector3();
-      plane.getWorldPosition(worldPos);
+      cardGroup.getWorldPosition(worldPos);
 
       const lookTarget = new THREE.Vector3(0, worldPos.y, 0);
-      plane.lookAt(lookTarget);
-      plane.rotateY(Math.PI);
+      cardGroup.lookAt(lookTarget);
+      cardGroup.rotateY(Math.PI);
 
+      const swingAxis = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+      const up = new THREE.Vector3(0, 1, 0);
+      const tiltAxis = new THREE.Vector3()
+        .crossVectors(swingAxis, up)
+        .normalize();
+      const tiltAngle = THREE.MathUtils.degToRad(15);
+      const tiltQ = new THREE.Quaternion().setFromAxisAngle(
+        tiltAxis,
+        tiltAngle
+      );
+      cardGroup.applyQuaternion(tiltQ);
+
+      // 클릭/레이캐스트는 여전히 이미지 메쉬 기준
       imageMeshes.push(plane);
       meshToData.set(plane, { ...data, id: docId });
 
-      const radial = new THREE.Vector3(pos.x, 0, pos.z).normalize();
-      const swingAxis = radial.clone().normalize();
-
-      hangingObjects.push({
+      const ho = {
+        id: docId,
         hanger,
         axis: swingAxis,
         angle: 0,
         vel: 0,
-        stiffness: 40,
-        damping: 5,
-      });
+        stiffness: 100,
+        damping: 8,
+        // 🔹 스케일 애니메이션
+        scale: 0,
+        targetScale: 1,
+        toRemove: false,
+      };
+
+      hangingObjects.push(ho);
+      plane.userData.ho = ho;
+
+      // 처음에는 스케일 0에서 시작 → 애니메이션으로 커짐
+      ho.hanger.scale.setScalar(0);
     },
     undefined,
     (err) => console.error("텍스처 로드 오류", err)
   );
 }
+
 
 /* ============================================================================
  *  트리 표면 전구
@@ -765,17 +1338,61 @@ const q = query(imagesCol, orderBy("createdAt", "asc"));
 onSnapshot(q, (snapshot) => {
   lastSnapshot = snapshot;
 
-  snapshot.docs.forEach((docSnap) => {
+  snapshot.docChanges().forEach((change) => {
+    const docSnap = change.doc;
     const id = docSnap.id;
-    if (shownImageIds.has(id)) return;
-    shownImageIds.add(id);
-
     const data = docSnap.data();
-    if (data.url) addImageToTree(id, data);
+
+    if (change.type === "added") {
+      if (shownImageIds.has(id)) return;
+      shownImageIds.add(id);
+      if (data.url) addImageToTree(id, data);
+    } else if (change.type === "removed") {
+      // 🔹 Firestore에서 삭제되면 트리 카드도 천천히 사라지게
+      startRemoveCard(id);
+    } else if (change.type === "modified") {
+      // 지금은 텍스트/좋아요만 바뀌니 3D카드는 그대로 둬도 OK
+    }
   });
 
   renderMyWishes();
 });
+
+// 🔹 삭제된 카드 → 스케일 0으로 줄어들게 마킹
+function startRemoveCard(docId) {
+  for (const plane of imageMeshes) {
+    const data = meshToData.get(plane);
+    if (!data || data.id !== docId) continue;
+
+    const ho = plane.userData?.ho;
+    if (ho) {
+      ho.toRemove = true;
+      ho.targetScale = 0;
+    }
+  }
+}
+
+// 🔹 실제로 트리/배열에서 제거
+function cleanupCardById(docId) {
+  for (let i = imageMeshes.length - 1; i >= 0; i--) {
+    const mesh = imageMeshes[i];
+    const data = meshToData.get(mesh);
+    if (!data || data.id !== docId) continue;
+
+    const pos = mesh.userData?.cardPos;
+    if (pos) {
+      const idx = cardPositions.indexOf(pos);
+      if (idx !== -1) cardPositions.splice(idx, 1);
+    }
+
+    meshToData.delete(mesh);
+    imageMeshes.splice(i, 1);
+  }
+
+  shownImageIds.delete(docId);
+}
+
+
 
 /* ============================================================================
  *  이미지 압축 & 업로드
@@ -846,8 +1463,9 @@ async function uploadAndRegister(file) {
   const snapshot = await uploadBytes(storageRef, processedFile);
   const downloadURL = await getDownloadURL(snapshot.ref);
 
-  const wishName = (wishNameInput.value || "").trim();
-  const wishText = (wishTextInput.value || "").trim();
+  const isAnonymous = isAnonymousState;
+  const rawWishName = (wishNameInput?.value || "").trim();
+  const wishText = (wishTextInput?.value || "").trim();
 
   await addDoc(imagesCol, {
     url: downloadURL,
@@ -855,30 +1473,36 @@ async function uploadAndRegister(file) {
     ownerUid: currentUser.uid,
     ownerEmail: currentUser.email,
     originalName: processedFile.name,
-    wishName,
+    wishName: isAnonymous ? "비밀 소원" : rawWishName,
     wishText,
+    isAnonymous,
+    usePolaroidFrame: isPolaroidOn,  // ✅ 프레임 사용 여부 저장
     createdAt: serverTimestamp(),
   });
+
+
 }
 
-wishSubmitBtn.addEventListener("click", async () => {
-  if (!currentUser) {
-    alert("먼저 로그인 해주세요.");
-    return;
-  }
-  const file = wishFileInput.files[0];
-  if (!file) {
-    alert("이미지를 선택해 주세요.");
-    return;
-  }
-  try {
-    await uploadAndRegister(file);
-    closeWishModal();
-  } catch (err) {
-    console.error("업로드 실패", err);
-    alert("업로드 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
-  }
-});
+if (wishSubmitBtn) {
+  wishSubmitBtn.addEventListener("click", async () => {
+    if (!currentUser) {
+      alert("먼저 로그인 해주세요.");
+      return;
+    }
+    const file = wishFileInput?.files[0];
+    if (!file) {
+      alert("이미지를 선택해 주세요.");
+      return;
+    }
+    try {
+      await uploadAndRegister(file);
+      closeWishModal();
+    } catch (err) {
+      console.error("업로드 실패", err);
+      alert("업로드 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
+    }
+  });
+}
 
 /* ============================================================================
  *  내 소원 리스트 렌더링
@@ -937,8 +1561,14 @@ function renderMyWishes() {
       dateSpan.className = "wish-date";
       dateSpan.textContent = formatDate(data.createdAt);
 
+      const likeInline = document.createElement("div");
+      likeInline.className = "wish-like-inline";
+      const likeCount = data.likesCount || 0;
+      likeInline.textContent = `♥ ${likeCount.toString()}`;
+
       main.appendChild(textSpan);
       main.appendChild(dateSpan);
+      main.appendChild(likeInline);
 
       const delBtn = document.createElement("button");
       delBtn.className = "wish-delete";
@@ -977,13 +1607,48 @@ async function handleDeleteImage(docId, data) {
 }
 
 /* ============================================================================
- *  트리 이미지 클릭 → 편지 패널
+ *  트리 이미지 클릭 / POST 클릭 → 편지 패널 / 소원추가
  * ==========================================================================*/
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+// POST hover 감지
+renderer.domElement.addEventListener("mousemove", (event) => {
+  if (!postMeshes.length) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(pointer, camera);
+
+  const intersects = raycaster.intersectObjects(postMeshes, true);
+
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    if (hoveredPost !== hit) {
+      if (hoveredPost) setPostHoverTarget(hoveredPost, false);
+      hoveredPost = hit;
+      setPostHoverTarget(hoveredPost, true);
+    }
+  } else {
+    if (hoveredPost) {
+      setPostHoverTarget(hoveredPost, false);
+      hoveredPost = null;
+    }
+  }
+});
+
+// 클릭 처리: 1) POST 클릭 → 소원추가 모달  2) 트리 카드 클릭 → 편지 패널
 renderer.domElement.addEventListener("click", (event) => {
+  // 🔹 방금 전까지 드래그를 크게 했던 경우 → 클릭 처리 무시
+  if (dragDistance > DRAG_CLICK_THRESHOLD) {
+    dragDistance = 0; // 다음 클릭을 위해 초기화
+    return;
+  }
+  dragDistance = 0; // 정상 클릭이면 그냥 리셋
+
   const rect = renderer.domElement.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -991,6 +1656,14 @@ renderer.domElement.addEventListener("click", (event) => {
   pointer.set(x, y);
   raycaster.setFromCamera(pointer, camera);
 
+  // 1️⃣ POST 클릭 체크
+  const postHit = raycaster.intersectObjects(postMeshes, true);
+  if (postHit.length > 0) {
+    openWishModal();
+    return;
+  }
+
+  // 2️⃣ 이미지(소원 카드) 클릭
   const intersects = raycaster.intersectObjects(imageMeshes, false);
   if (intersects.length === 0) return;
 
@@ -1001,86 +1674,226 @@ renderer.domElement.addEventListener("click", (event) => {
   showWishPanel(data);
 });
 
+
 function showWishPanel(data) {
-  const sender =
-    (data.wishName && data.wishName.trim()) ||
-    data.ownerEmail ||
-    "익명";
+  const sender = formatWishSender(data);
 
   const text =
     (data.wishText && data.wishText.trim()) ||
     "소원이 비어 있어요. 마음속으로 빌었나 봐요 ✨";
 
-  wishSenderEl.textContent = sender;
-  wishContentEl.textContent = text;
-  wishPanel.classList.remove("hidden");
+  if (wishSenderEl) wishSenderEl.textContent = sender;
+  if (wishContentEl) wishContentEl.textContent = text;
+
+  if (wishViewImageEl) {
+    if (data.url) {
+      wishViewImageEl.style.backgroundImage = `url(${data.url})`;
+    } else {
+      wishViewImageEl.style.backgroundImage = "none";
+    }
+  }
+
+  // ✅ 이 소원에 프레임을 썼는지 여부 (기본값: true)
+  const useFrame = data.usePolaroidFrame !== false;
+  if (frameOverlayView) {
+    frameOverlayView.classList.toggle("frame-off", !useFrame);
+  }
+
+  currentOpenedWishId = data.id || null;
+  refreshLikeUI().catch((e) => console.error("refreshLikeUI error", e));
+
+  if (wishPanel) {
+    wishPanel.classList.remove("hidden");
+  }
+
+  if (wishViewLetter) {
+    wishViewLetter.classList.remove("is-closing");
+    requestAnimationFrame(() => {
+      wishViewLetter.classList.add("is-open");
+    });
+  }
 }
 
-function closeWishPanel() {
-  wishPanel.classList.add("hidden");
+
+function closeWishPanelPanelOnly() {
+  if (!wishPanel) return;
+
+  const finishClose = () => {
+    wishPanel.classList.add("hidden");
+    if (wishViewLetter) {
+      wishViewLetter.classList.remove("is-closing");
+      wishViewLetter.classList.remove("is-open");
+    }
+  };
+
+  if (!wishViewLetter) {
+    finishClose();
+    return;
+  }
+
+  wishViewLetter.classList.remove("is-open");
+  wishViewLetter.classList.add("is-closing");
+
+  const onTransitionEnd = (e) => {
+    if (e.target !== wishViewLetter) return;
+    wishViewLetter.removeEventListener("transitionend", onTransitionEnd);
+    finishClose();
+  };
+
+  wishViewLetter.addEventListener("transitionend", onTransitionEnd);
 }
 
-wishCloseBtn.addEventListener("click", closeWishPanel);
+if (wishCloseBtn) {
+  wishCloseBtn.addEventListener("click", closeWishPanelPanelOnly);
+}
+
+/* ============================================================================
+ *  좋아요 UI & 토글
+ * ==========================================================================*/
+
+async function refreshLikeUI() {
+  if (!currentOpenedWishId || !wishLikeBtn || !wishLikeCountEl) return;
+
+  const imgRef = doc(db, "treeImages", currentOpenedWishId);
+  const imgSnap = await getDoc(imgRef);
+  if (!imgSnap.exists()) return;
+
+  const data = imgSnap.data();
+  const count = data.likesCount || 0;
+  wishLikeCountEl.textContent = count;
+
+  if (!currentUser) {
+    wishLikeBtn.classList.add("disabled");
+    wishLikeBtn.disabled = true;
+    wishLikeBtn.textContent = "♡ 로그인 필요";
+    return;
+  }
+
+  const likeRef = doc(
+    db,
+    "treeImages",
+    currentOpenedWishId,
+    "likes",
+    currentUser.uid
+  );
+  const likeSnap = await getDoc(likeRef);
+  const hasLiked = likeSnap.exists();
+
+  wishLikeBtn.classList.remove("disabled");
+  wishLikeBtn.disabled = false;
+  wishLikeBtn.dataset.liked = hasLiked ? "1" : "0";
+  wishLikeBtn.textContent = hasLiked ? "♥ 좋아요 취소" : "♡ 좋아요";
+}
+
+async function toggleLike() {
+  if (!currentUser || !currentOpenedWishId) {
+    alert("로그인 후 좋아요를 누를 수 있어요.");
+    return;
+  }
+
+  const imgRef = doc(db, "treeImages", currentOpenedWishId);
+  const likeRef = doc(
+    db,
+    "treeImages",
+    currentOpenedWishId,
+    "likes",
+    currentUser.uid
+  );
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const imgSnap = await tx.get(imgRef);
+      if (!imgSnap.exists()) return;
+
+      const current = imgSnap.data();
+      const currentCount = current.likesCount || 0;
+
+      const likeSnap = await tx.get(likeRef);
+
+      if (likeSnap.exists()) {
+        tx.delete(likeRef);
+        tx.update(imgRef, {
+          likesCount: Math.max(currentCount - 1, 0),
+        });
+      } else {
+        tx.set(likeRef, {
+          userUid: currentUser.uid,
+          email: currentUser.email,
+          createdAt: serverTimestamp(),
+        });
+        tx.update(imgRef, {
+          likesCount: currentCount + 1,
+        });
+      }
+    });
+
+    await refreshLikeUI();
+  } catch (err) {
+    console.error("좋아요 처리 실패", err);
+    alert("좋아요 처리 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
+  }
+}
+
+if (wishLikeBtn) {
+  wishLikeBtn.addEventListener("click", toggleLike);
+}
 
 /* ============================================================================
  *  입력 상태 (마우스 / 터치 / 자이로)
  * ==========================================================================*/
 
-// ▶ 드래그 상태
 let isDragging = false;
 let prevX = 0;
-const dragRotateSpeed = 0.005; // 드래그 감도 (값 키우면 더 빨리 돈다)
+const dragRotateSpeed = 0.005;
 
-// ▶ 카메라 패럴럭스 입력 (마우스 / 자이로 공용)
+// 🔹 드래그 vs 클릭 구분용
+let dragDistance = 0;
+const DRAG_CLICK_THRESHOLD = 6; // px 기준, 이보다 많이 움직이면 "드래그"로 간주
+
 let mouseX = 0;
 let mouseY = 0;
 let gyroX = 0;
 let gyroY = 0;
-let useGyro = false; // true면 자이로값, false면 마우스값으로 패럴럭스
+let useGyro = false;
 
-// ▶ 트리 회전(자동 회전 + 드래그 관성)
+
 let baseRotationY = 0;
 let spinVelocityY = 0;
 
-// 🔧 자이로 기준점(중심 자세)용 변수
-let gyroBaseBeta = 0;    // 앞뒤 기준값
-let gyroBaseGamma = 0;   // 좌우 기준값
-let gyroCalibrated = false; // 처음 기준이 세팅되었는지 여부
+let gyroBaseBeta = 0;
+let gyroBaseGamma = 0;
+let gyroCalibrated = false;
 
-// ▶ 모바일 판별
 const isMobile =
   "ontouchstart" in window ||
   (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
 
-// 공용 드래그 시작
 function beginDrag(clientX) {
   isDragging = true;
   prevX = clientX;
-  spinVelocityY = 0; // 드래그 시작 시 관성 초기화
+  spinVelocityY = 0;
+  dragDistance = 0; // 🔹 새 드래그 시작할 때 거리 초기화
 }
 
-// 공용 드래그 이동
 function moveDrag(clientX) {
   const deltaX = clientX - prevX;
   prevX = clientX;
 
+  dragDistance += Math.abs(deltaX); // 🔹 얼마나 움직였는지 누적
+
   const deltaRot = deltaX * dragRotateSpeed;
 
-  // 트리 Y축 회전
   treeGroup.rotation.y += deltaRot;
   baseRotationY = treeGroup.rotation.y;
   spinVelocityY = deltaRot;
 
-  // 카드들에도 회전 관성 전달
   const impulse = deltaRot * 8.0;
   for (const ho of hangingObjects) {
     ho.vel += impulse;
   }
 }
 
-// ======================
-//  데스크탑: 마우스
-// ======================
+
 renderer.domElement.addEventListener("mousedown", (event) => {
   beginDrag(event.clientX);
 });
@@ -1090,20 +1903,14 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  // ✅ 드래그 여부와 상관없이 항상 패럴럭스용 마우스 좌표 업데이트
   mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
-  // 드래그 중일 때만 트리 회전 로직 실행
   if (isDragging) {
     moveDrag(event.clientX);
   }
 });
 
-
-// ======================
-//  모바일: 터치
-// ======================
 renderer.domElement.addEventListener(
   "touchstart",
   (event) => {
@@ -1139,12 +1946,10 @@ window.addEventListener(
  *  자이로(기울기 센서) 세팅
  * ==========================================================================*/
 
-// 📌 자이로 입력 → 기준점이 서서히 따라오는 버전
 function handleOrientation(event) {
-  const { beta, gamma } = event; // beta: 앞/뒤, gamma: 좌/우
+  const { beta, gamma } = event;
   if (beta == null || gamma == null) return;
 
-  // 1) 처음 한 번: "지금 자세"를 기준으로 잡기
   if (!gyroCalibrated) {
     gyroBaseBeta = beta;
     gyroBaseGamma = gamma;
@@ -1152,43 +1957,27 @@ function handleOrientation(event) {
     console.log("✅ Gyro first calibrate:", gyroBaseBeta, gyroBaseGamma);
   }
 
-  // 2) 현재 값과 기준값의 차이
-  let diffGamma = gamma - gyroBaseGamma; // 좌우
-  let diffBeta  = beta  - gyroBaseBeta;  // 상하
+  let diffGamma = gamma - gyroBaseGamma;
+  let diffBeta = beta - gyroBaseBeta;
 
-  // 3) 기준값을 천천히 현재 값 쪽으로 따라오게 해서
-  //    오래 들고 있으면 그 자세가 자연스럽게 중심이 되도록 만들기
-  //
-  //   neutralFollowStrength:
-  //     0.01  근처  → 기준 거의 고정
-  //     0.02~0.03 → 조금씩 손에 적응 (추천 시작값)
-  //     0.05 이상 → 너무 빨리 따라와서 효과 줄어듦
   const neutralFollowStrength = 0.1;
   gyroBaseGamma += diffGamma * neutralFollowStrength;
-  gyroBaseBeta  += diffBeta  * neutralFollowStrength;
+  gyroBaseBeta += diffBeta * neutralFollowStrength;
 
-  // 4) 업데이트된 기준 기준으로 다시 차이 계산
   diffGamma = gamma - gyroBaseGamma;
-  diffBeta  = beta  - gyroBaseBeta;
+  diffBeta = beta - gyroBaseBeta;
 
-  // 5) 감도 설정 (나누는 값이 작을수록 더 예민해짐)
-  const nxRaw = THREE.MathUtils.clamp(diffGamma / 5, -1, 1); // 좌우
-  const nyRaw = THREE.MathUtils.clamp(diffBeta  /5, -1, 1); // 상하
+  const nxRaw = THREE.MathUtils.clamp(diffGamma / 5, -1, 1);
+  const nyRaw = THREE.MathUtils.clamp(diffBeta / 5, -1, 1);
 
-  // 6) 원하는 방향(부호)로 뒤집기
-  //   -nx, -ny로 하면 "폰 기울이는 방향과 반대로" 카메라가 움직이는 느낌
-  //    (어색하면 여기 부호만 바꾸면 됨)
   const targetX = -nxRaw;
   const targetY = -nyRaw;
 
-  // 7) 부드럽게 보간해서 튐 방지
-  //    smooth: 0.1 → 조금 뻣뻣, 0.2~0.3 → 꽤 부드러움
   const smooth = 0.01;
   gyroX = gyroX * (1 - smooth) + targetX * smooth;
   gyroY = gyroY * (1 - smooth) + targetY * smooth;
 }
 
-// 📌 자이로 권한 요청 + 리스너 등록 버튼
 function setupGyroButton() {
   const DOE = window.DeviceOrientationEvent;
   if (!DOE) {
@@ -1196,7 +1985,6 @@ function setupGyroButton() {
     return;
   }
 
-  // 🔘 화면 왼쪽 위에 '기울여서 보기' 버튼 하나 띄우기
   const btn = document.createElement("button");
   btn.textContent = "📱 기울여서 보기";
   btn.style.position = "fixed";
@@ -1215,7 +2003,6 @@ function setupGyroButton() {
 
   btn.addEventListener("click", async () => {
     try {
-      // 🧪 옛날 iOS 스타일: requestPermission 존재
       if (typeof DOE.requestPermission === "function") {
         const state = await DOE.requestPermission();
         console.log("gyro permission:", state);
@@ -1226,7 +2013,6 @@ function setupGyroButton() {
           return;
         }
       }
-      // ✅ 여기까지 왔으면 리스너 등록 + 자이로 사용 ON
       useGyro = true;
       window.addEventListener("deviceorientation", handleOrientation, true);
 
@@ -1240,12 +2026,9 @@ function setupGyroButton() {
   });
 }
 
-// 모바일에서만 버튼 생성
 if (isMobile) {
   setupGyroButton();
 }
-
-
 
 /* ============================================================================
  *  리사이즈 & 줌
@@ -1276,10 +2059,7 @@ renderer.domElement.addEventListener(
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-
   renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  bokehPass.setSize(window.innerWidth, window.innerHeight);
 });
 
 /* ============================================================================
@@ -1288,26 +2068,24 @@ window.addEventListener("resize", () => {
 
 let lastTime = 0;
 
-// 🔧 PC / 모바일 각각 다른 패럴럭스 설정
 const PARALLAX_DESKTOP = {
-  x: 12,   // 좌우 (PC)
-  y: 6,    // 상하 (PC)
-  follow: 0.05, // 카메라 따라가는 속도 (PC)
+  x: 8,
+  y: 4,
+  follow: 0.05,
 };
 
 const PARALLAX_MOBILE = {
-  x: 12,   // 좌우 (모바일) → 조금 더 과장
-  y: 10,    // 상하 (모바일)
-  follow: 1, // 모바일은 살짝 더 빠르게 따라가게
+  x: 12,
+  y: 10,
+  follow: 1,
 };
-
 
 function animate(time) {
   requestAnimationFrame(animate);
   const delta = (time - lastTime) / 1000;
   lastTime = time;
 
-  // 자동 회전 + 드래그 관성
+  // 기본 트리 회전
   if (!isDragging) {
     const autoSpeed = 0.2;
     baseRotationY += autoSpeed * delta;
@@ -1321,24 +2099,22 @@ function animate(time) {
     treeGroup.rotation.y += (targetYRot - treeGroup.rotation.y) * 0.1;
   }
 
-  // ▶ 입력 값을 자이로 or 마우스로 선택
   const inputX = useGyro ? gyroX : mouseX;
   const inputY = useGyro ? gyroY : mouseY;
 
-  // ✅ 여기서 디바이스별 패럴럭스 설정 선택
   const p = isMobile ? PARALLAX_MOBILE : PARALLAX_DESKTOP;
 
   const baseCamY = 6;
-  const targetCamX = inputX * -p.x;             // 좌우 세기
-  const targetCamY = baseCamY + inputY * p.y;   // 상하 세기
+  const targetCamX = inputX * -p.x;
+  const targetCamY = baseCamY + inputY * p.y;
 
   camera.position.x += (targetCamX - camera.position.x) * p.follow;
   camera.position.y += (targetCamY - camera.position.y) * p.follow;
-  
-  // 별 회전
+
+  // 트리 별 회전
   star.rotation.y -= delta * 2;
 
-  // 라이트 궤도
+  // 트리 주변 도는 라이트
   const t = time * 0.001;
   for (let i = 0; i < movingLights.length; i++) {
     const { light, sphere, glow } = movingLights[i];
@@ -1359,19 +2135,54 @@ function animate(time) {
     glow.position.copy(light.position);
   }
 
-  // 🌊 가지에 매달린 카드 스윙
-  for (const ho of hangingObjects) {
+  // 눈 애니메이션 (프레임당 랜덤 호출 최소화)
+  const pos = snowGeo.attributes.position;
+  for (let i = 0; i < snowCount; i++) {
+    let y = pos.getY(i);
+
+    // 미리 정해둔 속도로만 이동
+    y -= delta * snowVelocities[i];
+
+    // 바닥 근처로 내려가면 위로 올리면서 속도만 새로 랜덤 설정
+    if (y < 0.5) {
+      y = Math.random() * 20 + 5;
+      snowVelocities[i] = 0.5 + Math.random() * 0.3;
+    }
+
+    pos.setY(i, y);
+  }
+  pos.needsUpdate = true;
+
+
+  // 소원 카드 펜듈럼 + 등장/퇴장 스케일
+  for (let i = hangingObjects.length - 1; i >= 0; i--) {
+    const ho = hangingObjects[i];
     const k = ho.stiffness;
     const d = ho.damping;
 
-    ho.vel += (-k * ho.angle) * delta;   // 복원력
-    ho.vel -= ho.vel * d * delta;        // 마찰
-    ho.angle += ho.vel * delta;          // 적분
-
+    // 펜듈럼 스윙
+    ho.vel += -k * ho.angle * delta;
+    ho.vel -= ho.vel * d * delta;
+    ho.angle += ho.vel * delta;
     ho.hanger.quaternion.setFromAxisAngle(ho.axis, -ho.angle);
+
+    // 스케일 애니메이션 (0 ↔ 1)
+    const scaleDamp = 6;
+    const sLerp = 1 - Math.exp(-scaleDamp * delta);
+    ho.scale = ho.scale + (ho.targetScale - ho.scale) * sLerp;
+    ho.hanger.scale.setScalar(ho.scale);
+
+    // 삭제 예약된 카드: 충분히 작아지면 실제로 제거
+    if (ho.toRemove && ho.scale < 0.02) {
+      if (ho.hanger.parent) {
+        ho.hanger.parent.remove(ho.hanger);
+      }
+      cleanupCardById(ho.id);
+      hangingObjects.splice(i, 1);
+    }
   }
 
-  // 🌟 트리 표면 전구 깜빡임
+  // 트리 전구 깜빡임
   const t2 = time * 0.001;
   for (let i = 0; i < treeBulbs.length; i++) {
     const bulb = treeBulbs[i];
@@ -1380,20 +2191,90 @@ function animate(time) {
     sprite.material.opacity = pulse;
   }
 
-  // 눈 떨어지는 애니메이션
-  const pos = snowGeo.attributes.position;
-  for (let i = 0; i < snowCount; i++) {
-    let y = pos.getY(i);
-    y -= delta * (0.5 + Math.random() * 0.3);
-    if (y < 0.5) {
-      y = Math.random() * 20 + 5;
+  // 🔶 POST hover 애니메이션
+  // 🔶 POST hover 애니메이션
+  let maxPostHover = 0;  // ← 이번 프레임에 POST들이 얼마나 hover 됐는지 최대값
+
+  for (const mesh of postMeshes) {
+    const ud = mesh.userData || (mesh.userData = {});
+
+    if (!ud.basePosition) {
+      ud.basePosition = mesh.position.clone();
     }
-    pos.setY(i, y);
+
+    const mat = mesh.material;
+    if (mat && mat.isMeshStandardMaterial) {
+      if (!ud.baseColor) {
+        ud.baseColor = mat.color.clone();
+        ud.hoverColor = mat.color.clone().offsetHSL(0, 0, 0.15);
+        ud.baseEmissiveIntensity = mat.emissiveIntensity ?? 0.2;
+      }
+    }
+
+    const target = ud.hoverTarget || 0;       // 0 또는 1
+    const state = ud.hoverState ?? 0;
+    ud.hoverState = state + (target - state) * 0.15; // 부드러운 보간
+
+    // 이번 프레임에서 hover가 가장 많이 된 POST 값 기록
+    if (ud.hoverState > maxPostHover) {
+      maxPostHover = ud.hoverState;
+    }
+
+    const lift = 0.3 * ud.hoverState;
+    mesh.position.y = ud.basePosition.y + lift;
+
+    if (mat && mat.isMeshStandardMaterial && ud.baseColor && ud.hoverColor) {
+      mat.color.copy(ud.baseColor).lerp(ud.hoverColor, ud.hoverState);
+      mat.emissiveIntensity =
+        ud.baseEmissiveIntensity + 0.5 * ud.hoverState;
+    }
   }
-  pos.needsUpdate = true;
+
+  // 🔆 hover 강도에 따라 spotLight / spotLight2 / postLight
+
+  // 0) 메인 스포트라이트는 hover 중에 살짝 어두워지게
+  const SPOT1_BASE = 2.0;   // 평소 밝기
+  const SPOT1_MIN  = 0;   // hover 최대일 때 밝기 (원하는 대로 조정)
+
+  spotLight.intensity = THREE.MathUtils.lerp(
+    SPOT1_BASE,
+    SPOT1_MIN,
+    maxPostHover
+  );
+
+
+  const SPOT2_MAX = 6;
+  spotLight2.intensity = THREE.MathUtils.lerp(0, SPOT2_MAX, maxPostHover);
+
+  // t는 위에서 const t = time * 0.001; 이런 식으로 이미 쓰고 있다고 가정
+  const pulse = 0.5 + 0.5 * Math.sin(t * 3.0); // 3.0은 숨쉬기 속도
+
+  // 🔹 항상 존재하는 기본 숨쉬기
+  const baseIntensity = 1;    // 기본 밝기
+  const basePulseAmp  = 0.25;   // 기본 숨쉬기 폭
+
+  // 🔹 hover 되었을 때 추가로 얹을 숨쉬기
+  const hoverPulseAmp = 0.4;    // hover 시 추가 폭
+
+  // 기본 + hover 보정
+  postLight.intensity =
+    baseIntensity +
+    basePulseAmp * pulse +                 // 항상 숨쉬는 부분
+    hoverPulseAmp * maxPostHover * pulse;  // hover 시 강해지는 부분
+
+  // (선택) 라이트 마커도 같이 숨쉬게
+  if (postLightMarker) {
+    const s =
+      0.35 +
+      0.5 * pulse +                       // 항상 숨쉬는 스케일
+      0.4 * maxPostHover * pulse;          // hover 시 더 크게
+    postLightMarker.scale.set(s, s, s);
+  }
+
+
 
   camera.lookAt(0, tree.position.y, 0);
-  composer.render();
+  renderer.render(scene, camera);
 }
 
 animate(0);

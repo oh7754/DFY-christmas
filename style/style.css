@@ -7,6 +7,27 @@
   box-sizing: border-box;
 }
 
+@font-face {
+    font-family: 'GangwonEducationModuche';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFLightA.woff') format('woff');
+    font-weight: 300;
+    font-display: swap;
+}
+.wish-input-name,
+.wish-secret-label,
+.wish-privacy-toggle,
+.wish-input-text,
+.wish-view-name,
+.wish-view-body,
+.polaroid-frame-btn,
+.wish-privacy-toggle,
+.wish-btn-primary  {
+  font-family: 'GangwonEducationModuche',
+    system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Noto Sans KR", sans-serif;
+    font-weight: normal;
+}
+
 html,
 body {
   width: 100%;
@@ -21,12 +42,9 @@ body {
   overflow: hidden; /* three.js 캔버스가 전체 화면을 쓰게 */
 }
 
-/* three.js 캔버스는 JS에서 body에 바로 append 되므로
-   따로 스타일 줄 필요는 없지만 혹시 몰라서 */
 canvas {
   display: block;
 }
-
 
 /* ========================
    상단 프로필 + 햄버거
@@ -35,7 +53,7 @@ canvas {
 .top-bar {
   position: fixed;
   top: 16px;
-  right: 16px;
+  left: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -46,33 +64,34 @@ canvas {
 .top-account {
   display: flex;
   align-items: center;
-  background: #111827;
   border-radius: 999px;
   padding: 8px 8px;
   max-width: 320px;
   height: 58px;
   overflow: hidden;
   transition: all 0.6s cubic-bezier(0.3, 0, 0, 1);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 1px #e5e7eb40;
+  background: #ffffff10;
+  backdrop-filter: blur(10px);
+  transform: translateX(0);
   cursor: pointer;
 }
 
-/* 접힌 상태: 동그라미만 보이도록 */
 .top-account.collapsed {
   width: 58px;
   padding-right: 8px;
 }
 
-/* 펼쳐진 상태: 메일 텍스트 노출 */
 .top-account.expanded {
   width: 320px;
 }
 
 .top-account:hover {
-  background: #192235;
-  transition: 0s ease;
-  border: 1px solid #ffffff50;
+  transition: 0.3s ease;
+  box-shadow: inset 0 0px 2px #e5e7eb40;
+  background: #ffffff20;
+  backdrop-filter: blur(10px);
+  transform: translateX(0);
 }
 
 /* 아바타 동그라미 */
@@ -90,7 +109,7 @@ canvas {
 
 .top-account-avatar span {
   font-size: 18px;
-  font-weight: 600;
+
 }
 
 .profile-image {
@@ -117,12 +136,10 @@ canvas {
   transition: opacity 1s ease;
 }
 
-/* 접힌 상태에서는 텍스트 보이지 않게 */
 .top-account.collapsed .top-account-text {
   opacity: 0;
 }
 
-/* 펼쳐진 상태에서만 자연스럽게 보이도록 */
 .top-account.expanded .top-account-text {
   opacity: 1;
 }
@@ -136,9 +153,9 @@ canvas {
 }
 
 .top-sub {
-  margin-top:4px ;
+  margin-top: 4px;
   font-size: 12px;
-  opacity: 0.40;
+  opacity: 0.4;
 }
 
 /* ========================
@@ -149,21 +166,25 @@ canvas {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  border: 0px solid #ffffff;
-  background: #111827;
+  border: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   position: relative;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
   outline: 0;
+  box-shadow: inset 0 1px 1px #e5e7eb40;
+  background: #ffffff10;
+  backdrop-filter: blur(10px);
+  transform: translateX(0);
 }
 
 .menu-circle:hover {
-  background: #192235;
-  transition: 0s ease;
-  border: 1px solid #ffffff50;
+  transition: 0.3s ease;
+  box-shadow: inset 0 0px 2px #e5e7eb40;
+  background: #ffffff20;
+  backdrop-filter: blur(10px);
+  transform: translateX(0);
 }
 
 .menu-circle .menu-icon {
@@ -181,7 +202,6 @@ canvas {
   background: #e5e7eb;
 }
 
-/* X 텍스트는 기본적으로 숨겨두고, open 상태에서만 표시 */
 .menu-circle .menu-close {
   position: absolute;
   font-size: 20px;
@@ -204,14 +224,9 @@ canvas {
 .side-panel {
   position: fixed;
   top: 100px;
-  right: 16px;
+  left: 16px;
   width: 392px;
   max-width: 100%;
-  background: #111827;
-  backdrop-filter: blur(200px);
-  box-shadow: -0px 0 0px rgba(0, 0, 0, 0.8);
-  transform: translateX(110%);
-  transition: all 0.6s cubic-bezier(0.3, 0, 0, 1);
   z-index: 30;
   display: flex;
   flex-direction: column;
@@ -219,14 +234,16 @@ canvas {
   height: min-content;
   overflow: hidden;
   opacity: 0;
-  /* filter: blur(12px); */
+  box-shadow: inset 0 1px 1px #e5e7eb40;
+  background: #ffffff10;
+  backdrop-filter: blur(10px);
+  transform: translateX(0);
+  transition: all 0.6s cubic-bezier(0.3, 0, 0, 1);
 }
 
 .side-panel.open {
   transform: translateX(0);
-  box-shadow: -20px 0 40px rgba(0, 0, 0, 0.8);
   opacity: 1;
-  /* filter: blur(0px); */
 }
 
 .side-inner {
@@ -248,7 +265,7 @@ canvas {
   font-weight: 600;
 }
 
-/* ===== 버튼 공통 ===== */
+/* 버튼 공통 */
 .btn {
   border: none;
   border-radius: 999px;
@@ -272,8 +289,7 @@ canvas {
   color: #e5e7eb;
 }
 
-/* ===== 내 소원 리스트 ===== */
-
+/* 내 소원 리스트 */
 .wish-list {
   padding-top: 8px;
   flex: 1;
@@ -290,22 +306,24 @@ canvas {
 .wish-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 8px;
+  gap: 18px;
   border-radius: 8px;
-  background: rgba(31, 41, 66, 0.9);
-  /* box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55); */
-  margin-bottom: 12px;
+  opacity: 60%;
+  transition: 0.1s;
+}
+
+.wish-row:hover {
+  opacity: 100%;
 }
 
 .wish-thumb {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   border-radius: 6px;
-  background: #111827;
   background-size: cover;
   background-position: center;
   flex-shrink: 0;
+  margin-top: 18px;
 }
 
 .wish-main {
@@ -316,88 +334,417 @@ canvas {
 }
 
 .wish-text {
-  font-size: 14px;
-  white-space: nowrap;
+  font-size: 16px;
+  line-height: 120%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .wish-date {
-  font-size: 11px;
+  font-size: 14px;
   opacity: 0.6;
   margin-top: 6px;
 }
 
 .wish-delete {
   border: none;
+  position: relative;
+  bottom: 22px;
+  right: 8px;
   background: transparent;
-  color: #f97373;
+  color: #ffffff40;
   font-size: 16px;
   padding: 4px;
   cursor: pointer;
 }
 
 /* ========================
-   트리 이미지 클릭 → 편지 패널
+   소원 보기 모달 (트리에서 클릭)
    ======================== */
 
-.wish-panel {
+.wish-view-modal {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 25;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 38; /* 작성 모달(40)보다 조금 아래 */
 }
 
-.wish-panel.hidden {
+.wish-view-modal.hidden {
   display: none;
 }
 
-.wish-panel-inner {
-  width: min(420px, 90vw);
-  background: rgba(15, 23, 42, 0.98);
-  border-radius: 24px;
-  padding: 16px 18px 18px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-}
-
-.wish-panel-header {
+.wish-view-modal:not(.hidden) {
   display: flex;
-  justify-content: space-between;
+}
+
+/* 어두운 배경 */
+.wish-view-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 11, 20, 0.4);
+  backdrop-filter: blur(32px);
+}
+
+/* 안쪽 래퍼 */
+.wish-view-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.wish-panel-label {
-  font-size: 11px;
-  opacity: 0.6;
-}
-
-.wish-panel-sender {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.pill-close {
-  border-radius: 999px;
-  border: none;
-  background: rgba(15, 23, 42, 0.9);
-  color: #e5e7eb;
-  width: 28px;
-  height: 28px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.wish-panel-body {
-  font-size: 13px;
-  line-height: 1.5;
-  margin-top: 4px;
+  transform: rotate(10deg) translate(140px,0px); 
 }
 
 /* ========================
-   소원 추가 모달
+   ✉️ 공통 편지지 컨테이너 (작성 + 열람)
+   ======================== */
+
+.wish-letter,
+.wish-view-letter {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(900px, 100vw - 32px);
+  aspect-ratio: 3 / 4;
+  transform-origin: 50% 50%;
+
+  /* 기본 상태: 화면 중앙보다 살짝 아래 + 투명 */
+  transform: translate(-50%, -40%) scale(1);
+  opacity: 0;
+
+  transition:
+    transform 0.4s cubic-bezier(0.22, 0.8, 0.15, 1),
+    opacity   0.4s cubic-bezier(0.22, 0.8, 0.15, 1);
+}
+
+/* 🔼 열릴 때 – 딱 정중앙에서 보이게 */
+.wish-letter.is-open,
+.wish-view-letter.is-open {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+/* 🔽 닫힐 때 – 기본 위치로 내려가면서 페이드 아웃 */
+.wish-letter.is-closing,
+.wish-view-letter.is-closing {
+  transform: translate(-50%, -40%) scale(1);
+  opacity: 0;
+}
+
+/* 편지지 배경 이미지 (작성 + 열람 공통) */
+.wish-letter-bg,
+.wish-view-letter-bg {
+  position: absolute;
+  inset: 0;
+  margin: 5%;
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 편지 내부 좌표계 (작성 + 열람 공통)
+   - letter-1.png 기준으로 전체 중앙에 맞추고, 테이프/여백 고려해서 패딩 */
+.wish-letter-content,
+.wish-view-letter-content {
+  position: absolute;
+  inset: 0;
+  padding: 12% 10% 14%;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+/* ========================
+   이미지 영역 (작성 + 열람 공통 위치)
+   - 편지 밖(왼쪽)에 배치
+   ======================== */
+.wish-view-transform {
+  transform: translate(-50%, -50%) rotate(-16deg);
+  /* background-color: #22c55e; */
+  top: 50%;                      /* 세로 위치 (중앙보다 살짝 위) */
+  left: -10%;
+  width: 56%;  
+  position: absolute;
+}
+.wish-image-dropzone,
+.wish-view-image {
+  /* 프레임 중앙 쯤에 정사각형으로 넣기 */
+  aspect-ratio: 1 / 1;           /* ✅ 항상 정사각형 */
+  border-radius: 18px;
+  overflow: visible;              /* ✅ 정사각형 바깥은 잘라버리기 */
+  /* display: flex; */
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;  /* ✅ 정 중앙 */
+  background-repeat: no-repeat;
+}
+
+/* 작성용 – 드롭존 스타일 */
+.wish-image-dropzone {
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+
+
+/* 드롭존 안의 이미지 미리보기 */
+.wish-image-preview {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center; /* ✅ 정 중앙 */
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* 이미지가 들어온 상태 */
+.wish-image-dropzone.has-image .wish-image-preview {
+  opacity: 1;
+}
+
+.wish-image-dropzone.has-image .wish-image-placeholder {
+  opacity: 0;
+}
+
+/* 플레이스홀더 텍스트 */
+.wish-image-placeholder {
+  position: relative;
+  text-align: center;
+  color: #ffffff;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.wish-image-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.wish-image-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+
+/* ========================
+   텍스트 영역 (작성 + 열람 공통 위치)
+   - 기본: 편지 안에서 오른쪽 영역 전체
+   ======================== */
+
+.wish-text-area,
+.wish-view-text-area {
+  position: relative;
+  top: 46%;
+  left: 15%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 70%;
+}
+
+.wish-input-name,
+.wish-secret-label,
+.wish-privacy-toggle,
+.wish-input-text,
+.wish-view-name,
+.wish-view-body {
+  color: #111827;
+}
+
+/* 이름 줄 전체 (이름 + 토글 버튼) – 작성용 */
+.wish-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  position: relative;
+}
+
+/* 가운데 박스: 딱 '이름' 폭만 기준 */
+.wish-name-center {
+  position: relative;
+  display: inline-block;
+}
+
+/* 이름 + 빗금 기준이 되는 래퍼 */
+.wish-name-field {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* 인풋 기본 */
+.wish-input-name {
+  font-size: 34px;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  padding: 4px 0 6px;
+  outline: none;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.wish-input-name::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* 빗금: 이름 폭만큼, JS에서 CSS 변수로 길이 전달 */
+.wish-name-field::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: var(--anon-line-width, 0);
+  height: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  top: 52%;
+  transform-origin: center center;
+  transform: translateY(-50%) rotate(-10deg);
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* 익명 모드일 때만 빗금 + 연한 이름색 */
+.wish-name-field.is-anonymous .wish-input-name {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.wish-name-field.is-anonymous::after {
+  opacity: 1;
+}
+
+/* '비밀 소원' 라벨 */
+.wish-secret-label {
+  position: absolute;
+  left: 100%;
+  margin-left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 28px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.wish-name-field.is-anonymous .wish-secret-label {
+  opacity: 1;
+}
+
+
+/* 소원 본문 텍스트 – 작성용 */
+.wish-input-text {
+  width: 100%;
+  min-height: 120px;
+  border: none;
+  border-radius: 0;
+  font-size: 26px;
+  line-height: 1.7;
+  resize: vertical;
+  background: transparent;
+  outline: none;
+  text-align: center;
+}
+
+.wish-input-text::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* 소원 열람용 텍스트 */
+.wish-view-name {
+  font-size: 34px;
+  text-align: center;
+}
+
+.wish-view-body {
+  font-size: 26px;
+  line-height: 1.7;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* 비활성(익명 모드일 때 등) 공통 */
+.wish-input-disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.wish-image-frame {
+  position: absolute;
+  top: -18%;
+  left: -28%;
+  display: block;
+  width: 156%;
+  transform-origin: center;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+/* 토글 OFF 상태 */
+.wish-image-frame.frame-off {
+  opacity: 0;
+}
+
+/* ========================
+   공통 동그라미 X 버튼 (작성 + 열람)
+   ======================== */
+
+.wish-close-circle {
+  position: absolute;
+  top: 25%;
+  right: 17%;
+  width: 40px;
+  height: 40px;
+  color: #000000;
+  background-color: transparent;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 300;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+  z-index: 2;
+  opacity: 0.4;
+}
+
+.wish-close-circle:hover {
+  opacity: 1;
+}
+
+/* ========================
+   소원 추가 모달 (작성 편지지)
    ======================== */
 
 .modal {
@@ -406,7 +753,7 @@ canvas {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 40; /* 탑바/패널 위로 */
+  z-index: 40;
 }
 
 .modal.hidden {
@@ -417,107 +764,241 @@ canvas {
   display: flex;
 }
 
+/* 어두운 배경 */
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(7, 11, 20, 0.4);
   backdrop-filter: blur(12px);
+  transition:
+   backdrop-filter 0.12s ease;
 }
 
-.modal-content {
+/* 모달 안 중앙 정렬 래퍼 */
+#wishModal .wish-modal-inner {
   position: relative;
-  width: min(480px, 94vw);
-  background: #020617;
-  border-radius: 24px;
-  padding: 20px 22px 18px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.35);
   z-index: 1;
-  color: #f9fafb;
-}
-
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 14px;
-}
-
-/* ===== 폼 ===== */
-
-.form-group {
-  margin-bottom: 12px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 13px;
-  margin-bottom: 4px;
-}
-
-.form-help {
-  font-size: 11px;
-  opacity: 0.7;
-  margin-top: 2px;
-}
-
-input[type="file"],
-input[type="text"],
-textarea {
-  width: 100%;
-  background: #020617;
-  border-radius: 10px;
-  border: 1px solid #4b5563;
-  padding: 6px 8px;
-  color: #f9fafb;
-  font-size: 13px;
-}
-
-input[type="file"] {
-  padding: 4px 6px;
-  font-size: 12px;
-}
-
-textarea {
-  resize: vertical;
-  min-height: 90px;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #6b7280;
-}
-
-.modal-actions {
-  margin-top: 16px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  transform: rotate(10deg) translate(100px,0px); 
 }
 
 /* ========================
-   반응형 조금만
+   버튼 영역
    ======================== */
 
+.wish-actions {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-top: 6%;
+  gap: 8px;
+}
+
+/* 프레임 끄기 / 비밀소원 / 소원 올리기 공통 버튼 스타일 */
+.polaroid-frame-btn,
+.wish-privacy-toggle,
+.wish-btn-primary {
+  min-width: 100px;
+  padding: 8px 14px;
+  font-size: 16px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+/* 공통 hover 효과 */
+.polaroid-frame-btn:hover,
+.wish-privacy-toggle:hover,
+.wish-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* 개별 스타일 */
+
+/* 폴라로이드 프레임 토글 (색/위치만 개별) */
+.polaroid-frame-btn {
+  position: absolute;
+  left: 5%;
+  bottom: -9%;
+  background-color: #fef100;
+  color: #111827;
+}
+
+/* 비밀소원 토글 */
+.wish-privacy-toggle {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.55);
+}
+
+/* 소원 올리기 버튼 */
+.wish-btn-primary {
+  background: #ffffff;
+  color: #000110;
+}
+
+.wish-like-bar {
+  bottom: 28%;
+  left: 0%;
+  width: 100%;
+  position: absolute;
+  text-align: center;
+  /* background-color: #22c55e; */
+}
+
+.wish-like-count {
+  font-size: 18px;
+  color: #111827;
+}
+
+/* 내 소원 리스트에서 좋아요 숫자 */
+.wish-like-inline {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #f97373;
+}
+
+
+/* ========================
+   반응형 – 가로 폭 기준
+   ======================== */
+
+/* 태블릿 정도: 편지 폭만 살짝 줄이기 */
+@media (max-width: 1024px) {
+  .wish-letter,
+  .wish-view-letter {
+    width: min(720px, 100vw - 24px);
+  }
+}
+
+/* 모바일: 편지/텍스트/이미지 전체 스케일 + 레이아웃 변경
+   - 이미지 위쪽 중앙, 텍스트 아래쪽으로 스택 */
 @media (max-width: 640px) {
-  .top-bar {
-    top: 10px;
-    left: 10px;
+  .wish-letter,
+  .wish-view-letter {
+    width: min(480px, 100vw - 16px);
   }
 
-  .top-account {
-    height: 52px;
+  .wish-letter-content,
+  .wish-view-letter-content {
+    padding: 14% 8% 12%;
   }
 
-  .menu-circle {
-    width: 52px;
-    height: 52px;
+  /* 📌 모바일에서는 편지 아래 중앙에 붙이기 */
+  .wish-image-dropzone,
+  .wish-view-image {
+    position: fixed;
+    top: calc(50% + 42%);   /* 편지 중심보다 조금 아래 = 편지 아래쪽 */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 72vw;
+    max-width: none;
+    aspect-ratio: 4 / 5;
   }
 
-  .side-inner {
-    padding-top: 72px;
+  .wish-text-area,
+  .wish-view-text-area {
+    top: 18%;
+    left: 8%;
+    right: 8%;
+    bottom: 18%;
   }
 
-  .wish-panel-inner {
-    border-radius: 18px;
+  .wish-input-name,
+  .wish-secret-label,
+  .wish-view-name {
+    font-size: 24px;
+  }
+
+  .wish-input-text,
+  .wish-view-body {
+    font-size: 18px;
+  }
+
+  .wish-privacy-toggle {
+    font-size: 14px;
+    height: 30px;
+    width: 80px;
+  }
+
+  .wish-like-bar {
+    left: 8%;
+    right: 8%;
+    transform: none;
+  }
+}
+
+
+/* ========================
+   반응형 – 세로 높이 기준 (스케일 + 위치)
+   ======================== */
+
+/* 브라우저 높이 900px 이하 → 살짝 축소 */
+@media (max-height: 900px) {
+  .wish-letter,
+  .wish-view-letter {
+    transform: translate(-50%, -40%) scale(0.9);
+  }
+
+  .wish-letter.is-open,
+  .wish-view-letter.is-open {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+
+  .wish-letter.is-closing,
+  .wish-view-letter.is-closing {
+    transform: translate(-50%, -40%) scale(0.9);
+  }
+}
+
+/* 750px 이하 → 한 번 더 축소 */
+@media (max-height: 750px) {
+  .wish-letter,
+  .wish-view-letter {
+    transform: translate(-50%, -40%) scale(0.8);
+  }
+
+  .wish-letter.is-open,
+  .wish-view-letter.is-open {
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+
+  .wish-letter.is-closing,
+  .wish-view-letter.is-closing {
+    transform: translate(-50%, -40%) scale(0.8);
+  }
+}
+
+/* 650px 이하 → 세로가 꽤 짧은 환경 */
+@media (max-height: 650px) {
+  .wish-letter,
+  .wish-view-letter {
+    transform: translate(-50%, -40%) scale(0.7);
+  }
+
+  .wish-letter.is-open,
+  .wish-view-letter.is-open {
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+
+  .wish-letter.is-closing,
+  .wish-view-letter.is-closing {
+    transform: translate(-50%, -40%) scale(0.7);
   }
 }

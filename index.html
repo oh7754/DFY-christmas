@@ -1,102 +1,206 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <title>크리스마스 트리 갤러리</title>
-  <link rel="stylesheet" href="style/style.css" />
+  <head>
+    <meta charset="UTF-8" />
+    <title>크리스마스 트리 갤러리</title>
+    <link rel="stylesheet" href="style/style.css" />
 
-  <!-- ✅ three / three/addons importmap -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
-    }
-  }
-  </script>
-</head>
-<body>
-  <!-- 상단 프로필 + 햄버거 버튼 -->
-  <div id="topBar" class="top-bar">
-    <div id="topAccount" class="top-account collapsed">
-      <div class="top-account-avatar">
-        <span id="topInitial">?</span>
-        <img id="topImage" class="profile-image hidden" alt="프로필 이미지" />
-      </div>
-      <div class="top-account-text">
-        <div id="topEmail" class="top-email">로그인 필요</div>
-        <div id="topSub" class="top-sub">사내 구글 계정만 사용 가능</div>
-      </div>
-    </div>
-
-    <button id="menuToggle" class="menu-circle" aria-label="메뉴 열기">
-      <div class="menu-icon">
-        <span></span><span></span><span></span>
-      </div>
-      <div class="menu-close">✕</div>
-    </button>
-  </div>
-
-  <!-- 햄버거 패널 -->
-  <div id="sidePanel" class="side-panel">
-    <div class="side-inner">
-      <div class="panel-section">
-        <div class="panel-section-header">
-          <span class="panel-title">내가 올린 소원</span>
-          <button id="openWishModal" class="btn primary small">+ 소원 추가</button>
+    <!-- ✅ three / three/addons importmap -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- 상단 프로필 + 햄버거 버튼 -->
+    <div id="topBar" class="top-bar">
+      <div id="topAccount" class="top-account collapsed">
+        <div class="top-account-avatar">
+          <span id="topInitial">?</span>
+          <img
+            id="topImage"
+            class="profile-image hidden"
+            alt="프로필 이미지"
+          />
         </div>
-        <div id="myWishList" class="wish-list"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 편지 패널 -->
-  <div id="wishPanel" class="wish-panel hidden">
-    <div class="wish-panel-inner">
-      <div class="wish-panel-header">
-        <div>
-          <div class="wish-panel-label">From</div>
-          <div id="wishSender" class="wish-panel-sender"></div>
+        <div class="top-account-text">
+          <div id="topEmail" class="top-email">로그인 필요</div>
+          <div id="topSub" class="top-sub">사내 구글 계정만 사용 가능</div>
         </div>
-        <button id="wishCloseBtn" class="pill-close" aria-label="편지 닫기">✕</button>
       </div>
-      <div class="wish-panel-body">
-        <p id="wishContent"></p>
+
+      <button id="menuToggle" class="menu-circle" aria-label="메뉴 열기">
+        <div class="menu-icon">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="menu-close">✕</div>
+      </button>
+    </div>
+
+    <!-- 햄버거 패널 -->
+    <div id="sidePanel" class="side-panel">
+      <div class="side-inner">
+        <div class="panel-section">
+          <div class="panel-section-header">
+            <span class="panel-title">내가 올린 소원</span>
+            <button id="openWishModal" class="btn primary small">
+              + 소원 추가
+            </button>
+          </div>
+          <div id="myWishList" class="wish-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 트리 위에서 클릭했을 때 나오는 편지 패널 -->
+    <!-- 트리 위에서 클릭했을 때 나오는 편지 보기 모달 -->
+    <div id="wishPanel" class="wish-view-modal hidden">
+      <div class="modal-backdrop"></div>
+
+      <div class="wish-view-inner">
+        <div class="wish-view-letter">
+          <!-- 편지지 이미지 재사용 -->
+          <img
+            src="source/letter.png"
+            alt="소원 편지"
+            class="wish-view-letter-bg"
+          />
+
+          <!-- 닫기 버튼 (작성 UI랑 동일 스타일) -->
+          <button
+            id="wishCloseBtn"
+            class="wish-close-circle"
+            aria-label="편지 닫기"
+          >
+            ✕
+          </button>
+
+          <!-- 편지 위 컨텐츠 -->
+          <div class="wish-view-letter-content">
+            <!-- 이미지 프리뷰 (드롭존 위치와 유사) -->
+            <div class="wish-view-transform" id="#wishViewImageTransform">
+              <div id="wishViewImage" class="wish-view-image"></div>
+              <img src="source/polaroid.png" alt="" class="wish-image-frame" id="wishFrameOverlay" />
+            </div>
+            
+           
+        
+            <!-- 이름 + 소원 내용 -->
+            <div class="wish-view-text-area">
+              <div class="wish-view-name" id="wishSender"></div>
+              <div class="wish-view-body">
+                <p id="wishContent"></p>
+              </div>
+            </div>
+            <!-- 편지 본문 아래 쪽에 추가 -->
+            <div class="wish-like-bar">
+              <button id="wishLikeBtn" class="wish-like-btn">♡ 좋아요</button>
+              <span id="wishLikeCount" class="wish-like-count">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- 소원 작성 모달 -->
+<div id="wishModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+
+  <div class="wish-modal-inner">
+    <div class="wish-letter">
+      <!-- 편지지 이미지 -->
+      <img
+        src="source/letter.png"
+        alt="편지지"
+        class="wish-letter-bg"
+      />
+
+      <!-- ✕ 동그라미 닫기 버튼 -->
+      <button
+        id="wishCancelBtn"
+        class="wish-close-circle"
+        aria-label="소원 작성 닫기"
+      >
+        ✕
+      </button>
+
+      <!-- 편지지 위에 얹히는 컨텐츠 -->
+      <div class="wish-letter-content">
+        <!-- 이미지 드롭존 -->
+         <div class="wish-view-transform" id="wishDropzoneTransform" >
+          <div id="wishImageDropzone" class="wish-image-dropzone">
+            <div class="wish-image-preview"></div>
+            <div class="wish-image-placeholder">
+              <p class="wish-image-title">소원 이미지를 올려주세요</p>
+              <p class="wish-image-desc">
+                이미지를 여기로 끌어놓거나<br />
+                클릭해서 파일을 선택할 수 있어요.
+              </p>
+            </div>
+          </div>
+          <img src="source/polaroid.png" alt="" class="wish-image-frame" id="wishFrameOverlay" />
+          <button id="polaroidFrameBtn" class="polaroid-frame-btn"> </button>
+        </div>
+        
+        <!-- 텍스트 입력 영역 -->
+        <div class="wish-text-area">
+          <div class="wish-name-row">
+            <!-- 가운데 정렬용: 이름 + '비밀 소원' 라벨 -->
+            <div class="wish-name-center">
+              <div class="wish-name-field">
+                <!-- 이름 인풋 -->
+                <input
+                  id="wishNameInput"
+                  class="wish-input-name"
+                  type="text"
+                  placeholder="이름을 적어주세요"
+                />
+                <!-- 익명일 때만 보이는 라벨 -->
+                <span class="wish-secret-label">비밀 소원</span>
+              </div>
+            </div>
+          </div>
+
+          <textarea
+            id="wishTextInput"
+            class="wish-input-text"
+            rows="5"
+            placeholder="여기에 소원을 적어주세요."
+          ></textarea>
+          <!-- 버튼 영역: 이제는 '소원 올리기'만 남김 -->
+          <div class="wish-actions">
+            <!-- 오른쪽 토글 버튼 -->
+                  <button
+                    id="wishPrivacyToggle"
+                    type="button"
+                    class="wish-privacy-toggle"
+                  >
+                    비밀소원
+                  </button>
+            <button id="wishSubmitBtn" class="wish-btn wish-btn-primary">
+              소원 올리기
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- 소원 추가 모달 -->
-  <div id="wishModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <h2 class="modal-title">소원 추가</h2>
+<!-- 기존 숨겨진 파일 input 그대로 사용 -->
+<input
+  id="wishFileInput"
+  type="file"
+  accept="image/*"
+  style="display:none"
+/>
 
-      <div class="form-group">
-        <label for="wishFileInput">이미지 선택</label>
-        <input id="wishFileInput" type="file" accept="image/*" />
-        <div class="form-help">큰 이미지는 자동으로 리사이즈되어 업로드돼요.</div>
-      </div>
-
-      <div class="form-group">
-        <label for="wishNameInput">소원을 빌 사람 이름 (선택)</label>
-        <input id="wishNameInput" type="text" placeholder="예: 진환, 우리 팀 모두…" />
-      </div>
-
-      <div class="form-group">
-        <label for="wishTextInput">소원 내용</label>
-        <textarea id="wishTextInput" rows="4"
-          placeholder="올해 이루고 싶은 소원을 적어보세요."></textarea>
-      </div>
-
-      <div class="modal-actions">
-        <button id="wishCancelBtn" class="btn secondary">취소</button>
-        <button id="wishSubmitBtn" class="btn primary">올리기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ✅ 우리 앱 엔트리포인트 -->
-  <script type="module" src="./main.js"></script>
-</body>
+    <!-- 앱 엔트리포인트 -->
+    <script type="module" src="./main.js"></script>
+  </body>
 </html>
