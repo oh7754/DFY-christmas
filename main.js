@@ -387,6 +387,27 @@ function closePanel() {
   menuToggle.classList.remove("open");
 }
 
+// ─────────────────────────────
+// 사이드 패널: 바깥 영역 클릭 시 닫기
+// ─────────────────────────────
+document.addEventListener("click", (e) => {
+  if (!sidePanel) return;
+  if (!sidePanel.classList.contains("open")) return;
+
+  const target = e.target;
+
+  // 사이드패널 내부 클릭이면 유지
+  if (sidePanel.contains(target)) return;
+
+  // 햄버거 버튼 / 상단 프로필 클릭이면 유지
+  if (menuToggle && menuToggle.contains(target)) return;
+  if (topAccount && topAccount.contains(target)) return;
+
+  // 그 외 모든 영역 클릭 → 패널 닫기
+  closePanel();
+});
+
+
 if (menuToggle) {
   menuToggle.addEventListener("click", () => {
     if (!sidePanel) return;
@@ -518,32 +539,18 @@ function closeWishModal() {
 }
 
 
+
 if (openWishModalBtn) {
   openWishModalBtn.addEventListener("click", openWishModal);
 }
 
-// ✉️ 소원 작성 모달 닫기(X 버튼)
+// ✉️ 소원 작성 모달 – 백드롭 클릭해서 닫기
+bindBackdropClose(wishModal, wishLetter, closeWishModal);
+
+// X 버튼은 그대로 유지
 if (wishCancelBtn) {
   wishCancelBtn.addEventListener("click", closeWishModal);
 }
-
-// ✉️ 소원 작성 모달 - 편지 밖(블러 영역) 클릭 시 닫기
-if (wishModal) {
-  wishModal.addEventListener("click", (e) => {
-    // 편지 카드 요소가 없으면 그냥 닫기
-    if (!wishLetter) {
-      closeWishModal();
-      return;
-    }
-
-    // 클릭한 타겟이 편지 영역 안에 없으면 = 바깥(블러/백드롭) 클릭
-    if (!wishLetter.contains(e.target)) {
-      closeWishModal();
-    }
-    // 편지 안쪽 클릭은 유지
-  });
-}
-
 
 /* ============================================================================
  *  캔버스 텍스처 (글로우 / 눈 입자)
@@ -1766,27 +1773,41 @@ function closeWishPanelPanelOnly() {
 }
 
 
+// ✉️ 소원 보기 모달 – 백드롭 클릭해서 닫기
+bindBackdropClose(wishPanel, wishViewLetter, closeWishPanelPanelOnly);
+
+// X 버튼은 그대로 유지
 if (wishCloseBtn) {
-  // X 버튼 눌렀을 때 닫기
   wishCloseBtn.addEventListener("click", closeWishPanelPanelOnly);
 }
 
-// 편지 밖(블러/주변 영역)을 클릭하면 닫히도록
-if (wishPanel) {
-  wishPanel.addEventListener("click", (e) => {
-    // 편지 카드 요소가 없으면 그냥 닫기
-    if (!wishViewLetter) {
-      closeWishPanelPanelOnly();
-      return;
-    }
 
-    // 클릭된 타겟이 편지 카드 안에 "포함되지 않으면" = 바깥 영역 클릭
-    if (!wishViewLetter.contains(e.target)) {
-      closeWishPanelPanelOnly();
-    }
-    // 편지 카드 안쪽을 클릭하면 아무 일도 안 일어나고 그대로 유지
-  });
+
+// ─────────────────────────────
+// 공통: 모달 백드롭 클릭 닫기 바인더
+// ─────────────────────────────
+function bindBackdropClose(modalEl, contentEl, closeFn) {
+  if (!modalEl || !closeFn) return;
+
+  // 실제로 어두운/블러 배경 역할을 하는 엘리먼트
+  const backdrop = modalEl.querySelector(".modal-backdrop");
+
+  // 1) 백드롭 클릭 → 모달 닫기
+  if (backdrop) {
+    backdrop.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeFn();
+    });
+  }
+
+  // 2) 모달 안쪽 콘텐츠 클릭은 버블링 막기 (백드롭으로 안 올라가게)
+  if (contentEl) {
+    contentEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  }
 }
+
 
 
 /* ============================================================================

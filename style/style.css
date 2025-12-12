@@ -432,7 +432,7 @@ canvas {
   transform-origin: 50% 50%;
 
   /* 기본 상태: 화면 중앙보다 살짝 아래 + 투명 */
-  transform: translate(-50%, -40%) scale(1);
+  transform: translate(-50%, -48%) scale(0.8);
   opacity: 0;
 
   transition:
@@ -443,14 +443,14 @@ canvas {
 /* 🔼 열릴 때 – 딱 정중앙에서 보이게 */
 .wish-letter.is-open,
 .wish-view-letter.is-open {
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, -48%) scale(1);
   opacity: 1;
 }
 
 /* 🔽 닫힐 때 – 기본 위치로 내려가면서 페이드 아웃 */
 .wish-letter.is-closing,
 .wish-view-letter.is-closing {
-  transform: translate(-50%, -40%) scale(1);
+  transform: translate(-50%, -48%) scale(0.8);
   opacity: 0;
 }
 
@@ -1090,16 +1090,19 @@ canvas {
     left: 50%;
     width: min(88vw, 420px);      /* 화면 폭 기준, 최대 420px */
     aspect-ratio: 3 / 5.2;        /* 카드 전체 비율 고정 */
-    transform: translate(-50%, -0%) rotate(0deg);
+    transform: translate(-38%, -34%) rotate(8deg) scale(0.8);
     transform-origin: center center;
-    opacity: 1;
+    opacity: 0;
   }
 
   /* 데스크탑 애니메이션 초기화 */
-  .wish-view-letter.is-open,
-  .wish-view-letter.is-closing {
-    transform: translate(-38%, -34%) rotate(8deg);
+  .wish-view-letter.is-open {
+    transform: translate(-38%, -34%) rotate(8deg) scale(1);
     opacity: 1;
+  }
+  .wish-view-letter.is-closing{
+    transform: translate(-38%, -34%) rotate(8deg) scale(0.8);
+    opacity: 0;
   }
 
   /* 편지지 배경 이미지(letter.png) */
