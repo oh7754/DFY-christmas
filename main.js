@@ -1122,7 +1122,7 @@ scene.add(snow);
 
 function getRandomPositionOnTree() {
   const maxAttempts = 25;    // 최대 시도 횟수
-  const minDist = 1.4;       // 카드끼리 최소 거리
+  const minDist = 1.6;       // 카드끼리 최소 거리
 
   // 트리 바닥 / 꼭대기 기준
   const yBottom = tree.position.y - treeHeight / 2;
@@ -1176,7 +1176,7 @@ function addImageToTree(docId, data) {
       const planeAspect = 1; // 정사각형
 
       // 3. geometry도 정사각형으로 (폴라로이드 프레임과 맞추기용)
-      const size = 1.0;              // 기본 한 변 길이
+      const size = 1;              // 기본 한 변 길이
       const geo = new THREE.PlaneGeometry(size, size);
 
       // 4. CSS의 background-size: cover + center 와 같은 효과

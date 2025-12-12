@@ -890,69 +890,9 @@ canvas {
 }
 
 
-
-/* ========================
-   반응형 – 세로 높이 기준 (스케일 + 위치)
-   ======================== */
-
-/* 브라우저 높이 900px 이하 → 살짝 축소 */
-@media (max-height: 900px) {
-  .wish-letter,
-  .wish-view-letter {
-    transform: translate(-50%, -40%) scale(0.9);
-  }
-
-  .wish-letter.is-open,
-  .wish-view-letter.is-open {
-    transform: translate(-50%, -50%) scale(0.9);
-  }
-
-  .wish-letter.is-closing,
-  .wish-view-letter.is-closing {
-    transform: translate(-50%, -40%) scale(0.9);
-  }
-}
-
-/* 750px 이하 → 한 번 더 축소 */
-@media (max-height: 750px) {
-  .wish-letter,
-  .wish-view-letter {
-    transform: translate(-50%, -40%) scale(0.8);
-  }
-
-  .wish-letter.is-open,
-  .wish-view-letter.is-open {
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-
-  .wish-letter.is-closing,
-  .wish-view-letter.is-closing {
-    transform: translate(-50%, -40%) scale(0.8);
-  }
-}
-
-/* 650px 이하 → 세로가 꽤 짧은 환경 */
-@media (max-height: 650px) {
-  .wish-letter,
-  .wish-view-letter {
-    transform: translate(-50%, -40%) scale(0.7);
-  }
-
-  .wish-letter.is-open,
-  .wish-view-letter.is-open {
-    transform: translate(-50%, -50%) scale(0.7);
-  }
-
-  .wish-letter.is-closing,
-  .wish-view-letter.is-closing {
-    transform: translate(-50%, -40%) scale(0.7);
-  }
-}
-
-
-/* =========================================
+/* ===============================================================================
    모바일 레이아웃 (max-width: 768px)
-   ========================================= */
+   =============================================================================== */
 @media (max-width: 768px) {
   /* 기본: 화면에 꽉차게, 스크롤은 오버레이에서만 나도록 */
   body {
@@ -1118,28 +1058,38 @@ canvas {
   }
 
   /* -------- 소원 보기 모달 (wishPanel) -------- */
+  .wish-view-modal {
+    width: 100dvw;
+  }
   .wish-view-inner {
     padding: 0;
     align-items: flex-end;
+    width: 100%;
+    transform: rotate(0deg) translate(0px,0px);
   }
 
   .wish-view-letter {
     width: 100%;
-    max-width: 420px;
-    margin: 0 auto;
-    border-radius: 16px;
-    overflow: hidden;
+    height: 50%;
+    transform: translate(0%, 0%) scale(1);
   }
 
   .wish-view-letter-bg {
+    margin: 0;
     width: 100%;
-    height: auto;
+    height: 100%;
   }
 
   .wish-view-letter-content {
-    padding: 16px 14px 20px;
+    /* padding: 16px 14px 20px; */
     gap: 12px;
+    height: 100%;
+    padding: 0%;
+    margin: 0%;
     flex-direction: column;
+  }
+  .wish-view-transform {
+    background-color: #6392ff3d;
   }
 
   .wish-view-image {
@@ -1148,22 +1098,23 @@ canvas {
   }
 
   .wish-view-text-area {
-    max-height: 40vh;
+    /* max-height: 40vh; */
     overflow-y: auto;
-    padding-right: 4px;
+    background-color: #22c55e;
   }
 
   .wish-view-name {
-    font-size: 14px;
+    font-size: 28px;
     margin-bottom: 4px;
   }
 
   .wish-view-body p {
-    font-size: 14px;
+    font-size: 24px;
     line-height: 1.5;
   }
 
   .wish-like-bar {
+    bottom: 14%;
     margin-top: 8px;
   }
 
