@@ -1064,8 +1064,8 @@ canvas {
   .wish-view-inner {
     padding: 0;
     align-items: flex-end;
-    width: 100%;
-    transform: rotate(0deg) translate(0px,0px);
+    width: 500px;
+    transform: rotate(0deg) translate(45px,120px) rotate(6deg);
   }
 
   .wish-view-letter {
@@ -1089,18 +1089,20 @@ canvas {
     flex-direction: column;
   }
   .wish-view-transform {
+    width: 320px;
     background-color: #6392ff3d;
+    transform: translate(-140px, -260px) rotate(-10deg) scale(1);
+    top: 0;
+    left: 0;
+    right: 0;
   }
 
-  .wish-view-image {
-    height: 46vw;
-    max-height: 220px;
-  }
 
   .wish-view-text-area {
     /* max-height: 40vh; */
     overflow-y: auto;
-    background-color: #22c55e;
+    /* background-color: #22c55e; */
+    transform: translate(0px,-30px);
   }
 
   .wish-view-name {
