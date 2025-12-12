@@ -1090,7 +1090,7 @@ canvas {
   /* 데스크탑 애니메이션 초기화 */
   .wish-view-letter.is-open,
   .wish-view-letter.is-closing {
-    transform: translate(-42%, -36%) rotate(8deg);
+    transform: translate(-42%, -28%) rotate(8deg);
     opacity: 1;
   }
 
@@ -1169,12 +1169,12 @@ canvas {
   }
 
   .wish-view-name {
-    font-size: clamp(18px, 3.4vw, 24px);
+    font-size: 24px;
     margin-bottom: 2px;
   }
 
   .wish-view-body {
-    font-size: clamp(15px, 3vw, 22px);
+    font-size: 22px;
     line-height: 1.6;
     margin-top: 0;
   }
@@ -1183,7 +1183,7 @@ canvas {
   .wish-view-letter .wish-like-bar {
     position: absolute;
     left: 50%;
-    bottom: 6%;
+    bottom: 180px;
     width: auto;
     transform: translateX(-50%);
     display: flex;
@@ -1203,11 +1203,13 @@ canvas {
 
   /* 보기 모달의 닫기 버튼 위치 (카드 기준) */
   .wish-view-letter .wish-close-circle {
-    top: -12%;
-    right: -4%;
+    top: 32%;
+    right: 10%;
     width: 40px;
     height: 40px;
     font-size: 30px;
-    opacity: 0.6;
+    /* transform: rotate(-8deg); */
+    opacity: 0.4;
+    /* background-color: #22c55e; */
   }
 }
