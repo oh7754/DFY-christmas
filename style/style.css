@@ -1058,74 +1058,155 @@ canvas {
   }
 
   /* -------- 소원 보기 모달 (wishPanel) -------- */
+  /* -------- 소원 보기 모달 (wishPanel) -------- */
   .wish-view-modal {
     width: 100dvw;
+    align-items: center;
+    justify-content: center;
   }
+
   .wish-view-inner {
     padding: 0;
-    align-items: flex-end;
-    width: 500px;
-    transform: rotate(0deg) translate(45px,120px) rotate(6deg);
+    width: 100dvw;
+    height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: none;
   }
 
+  /* 전체 카드(폴라로이드 + 편지 + 텍스트)가 한 번에 도는 컨테이너 */
   .wish-view-letter {
-    width: 100%;
-    height: 50%;
-    transform: translate(0%, 0%) scale(1);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(88vw, 420px);      /* 화면 폭 기준, 최대 420px */
+    aspect-ratio: 3 / 5.2;        /* 카드 전체 비율 고정 */
+    transform: translate(-50%, -0%) rotate(0deg);
+    transform-origin: center center;
+    opacity: 1;
   }
 
+  /* 데스크탑 애니메이션 초기화 */
+  .wish-view-letter.is-open,
+  .wish-view-letter.is-closing {
+    transform: translate(-42%, -36%) rotate(8deg);
+    opacity: 1;
+  }
+
+  /* 편지지 배경 이미지(letter.png) */
   .wish-view-letter-bg {
-    margin: 0;
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
+    margin: -10%;
+    width: 120%;
+    height: 120%;
+    object-fit: contain;
   }
 
   .wish-view-letter-content {
-    /* padding: 16px 14px 20px; */
-    gap: 12px;
-    height: 100%;
-    padding: 0%;
-    margin: 0%;
-    flex-direction: column;
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    margin: 0;
   }
+
+  /* 카드 안의 요소들은 더 이상 회전 X (카드에만 회전) */
+  .wish-view-transform,
+  .wish-view-image,
+  .wish-image-frame,
+  .wish-view-text-area,
+  .wish-view-letter .wish-like-bar {
+    transform: none;
+  }
+
+  /* 🔺 위쪽 폴라로이드 영역 (프레임 + 이미지) */
   .wish-view-transform {
-    width: 320px;
-    background-color: #6392ff3d;
-    transform: translate(-140px, -260px) rotate(-10deg) scale(1);
-    top: 0;
-    left: 0;
-    right: 0;
+    position: absolute;
+    top: 7%;
+    left: 50%;
+    width: 70%;
+    aspect-ratio: 1 / 1;          /* 폴라로이드 비율 유지 */
+    transform: translate(-100%, -50%) rotate(-14deg);
+    /* 디버그 색 지우기 */
+    background-color: transparent;
   }
 
+  /* 실제 소원 이미지 (폴라로이드 안쪽) */
+  .wish-view-image {
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  }
 
+  /* 폴라로이드 프레임 PNG
+     (기존 top / left / width 값은 유지 – 컨테이너 기준으로만 스케일) */
+  .wish-view-letter .wish-image-frame {
+    position: absolute;
+    top: -18%;
+    left: -28%;
+    width: 156%;
+    pointer-events: none;
+  }
+
+  /* 🔻 아래쪽 편지 텍스트 영역 */
   .wish-view-text-area {
-    /* max-height: 40vh; */
+    position: absolute;
+    left: 50%;
+    bottom: 15%;
+    width: 78%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+    max-height: 34%;              /* 텍스트가 너무 길면 내부 스크롤 */
     overflow-y: auto;
-    /* background-color: #22c55e; */
-    transform: translate(0px,-30px);
   }
 
   .wish-view-name {
-    font-size: 28px;
-    margin-bottom: 4px;
+    font-size: clamp(18px, 3.4vw, 24px);
+    margin-bottom: 2px;
   }
 
-  .wish-view-body p {
-    font-size: 24px;
-    line-height: 1.5;
+  .wish-view-body {
+    font-size: clamp(15px, 3vw, 22px);
+    line-height: 1.6;
+    margin-top: 0;
   }
 
-  .wish-like-bar {
-    bottom: 14%;
-    margin-top: 8px;
+  /* ❤️ 좋아요 – 카드 맨 아래 중앙 */
+  .wish-view-letter .wish-like-bar {
+    position: absolute;
+    left: 50%;
+    bottom: 6%;
+    width: auto;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
-  .wish-like-btn {
+  .wish-view-letter .wish-like-btn {
     font-size: 13px;
     padding: 8px 12px;
   }
 
-  .wish-like-count {
+  .wish-view-letter .wish-like-count {
     font-size: 13px;
   }
-}
+
+  /* 보기 모달의 닫기 버튼 위치 (카드 기준) */
+  .wish-view-letter .wish-close-circle {
+    top: -12%;
+    right: -4%;
+    width: 40px;
+    height: 40px;
+    font-size: 30px;
+    opacity: 0.6;
+  }
