@@ -200,22 +200,6 @@ let isPolaroidOn = true;
 
 // 트리 이미지 mesh → 데이터 매핑 (클릭용)
 const imageMeshes = [];
-// 카드 개수가 많아질수록 트리 카드 크기를 줄이는 헬퍼
-function getTreeCardScale() {
-  // 지금까지 걸린 카드 개수 (새로 추가될 것까지 고려하려고 +1)
-  const count = imageMeshes.length + 1;
-
-  const FULL_SIZE_COUNT = 20;  // 이 개수까지는 1.0 유지
-  const MAX_EXTRA_COUNT = 40;  // 여기까지 서서히 줄이고 그 이후는 고정
-  const MAX_SCALE = 0.8;       // 최대 크기
-  const MIN_SCALE = 0.8;      // 최소 크기 (많아졌을 때)
-
-  if (count <= FULL_SIZE_COUNT) return MAX_SCALE;
-
-  const extra = Math.min(count - FULL_SIZE_COUNT, MAX_EXTRA_COUNT);
-  const t = extra / MAX_EXTRA_COUNT; // 0 → 1
-  return THREE.MathUtils.lerp(MAX_SCALE, MIN_SCALE, t);
-}
 const meshToData = new Map();
 
 // 가지에 매달린 카드 피직스용
@@ -966,8 +950,8 @@ function getLayerIdFromHierarchy(obj) {
 
 // 버텍스 컬러 그라디언트 + 레이어 컬러
 function applyLayerShading(root) {
-  const greenTop = new THREE.Color(0x3fac00);
-  const greenBottom = new THREE.Color(0x003937);
+  const greenTop = new THREE.Color(0x003937);
+  const greenBottom = new THREE.Color(0x3fac00);
 
   const brownTop = new THREE.Color(0x5f4000);
   const brownBottom = new THREE.Color(0x2b0800);
@@ -1156,7 +1140,7 @@ scene.add(snow);
 
 function getRandomPositionOnTree() {
   const maxAttempts = 25;    // 최대 시도 횟수
-  const minDist = 1;       // 카드끼리 최소 거리
+  const minDist = 1.6;       // 카드끼리 최소 거리
 
   // 트리 바닥 / 꼭대기 기준
   const yBottom = tree.position.y - treeHeight / 2;
@@ -1210,9 +1194,7 @@ function addImageToTree(docId, data) {
       const planeAspect = 1; // 정사각형
 
       // 3. geometry도 정사각형으로 (폴라로이드 프레임과 맞추기용)
-      const BASE_SIZE = 1;                    // 기본 한 변 길이
-      const scaleFactor = getTreeCardScale(); // 🔹 카드 개수 기반 스케일
-      const size = BASE_SIZE * scaleFactor;
+      const size = 1;              // 기본 한 변 길이
       const geo = new THREE.PlaneGeometry(size, size);
 
       // 4. CSS의 background-size: cover + center 와 같은 효과
