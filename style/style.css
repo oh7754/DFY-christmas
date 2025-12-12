@@ -1090,7 +1090,7 @@ canvas {
   /* 데스크탑 애니메이션 초기화 */
   .wish-view-letter.is-open,
   .wish-view-letter.is-closing {
-    transform: translate(-42%, -28%) rotate(8deg);
+    transform: translate(-38%, -34%) rotate(8deg);
     opacity: 1;
   }
 
@@ -1098,9 +1098,9 @@ canvas {
   .wish-view-letter-bg {
     position: absolute;
     inset: 0;
-    margin: -10%;
-    width: 120%;
-    height: 120%;
+    margin: -7%;
+    width: 114%;
+    height: 114%;
     object-fit: contain;
   }
 
@@ -1125,9 +1125,9 @@ canvas {
     position: absolute;
     top: 7%;
     left: 50%;
-    width: 70%;
+    width: 68%;
     aspect-ratio: 1 / 1;          /* 폴라로이드 비율 유지 */
-    transform: translate(-100%, -50%) rotate(-14deg);
+    transform: translate(-116%, -42%) rotate(-14deg);
     /* 디버그 색 지우기 */
     background-color: transparent;
   }
