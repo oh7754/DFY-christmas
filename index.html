@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>크리스마스 트리 갤러리</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style/style.css" />
 
     <!-- ✅ three / three/addons importmap -->
@@ -51,7 +52,9 @@
               + 소원 추가
             </button>
           </div>
-          <div id="myWishList" class="wish-list"></div>
+          <div class="wish-list-wrap">
+            <div id="myWishList" class="wish-list"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -82,7 +85,7 @@
           <!-- 편지 위 컨텐츠 -->
           <div class="wish-view-letter-content">
             <!-- 이미지 프리뷰 (드롭존 위치와 유사) -->
-            <div class="wish-view-transform" id="#wishViewImageTransform">
+            <div class="wish-view-transform" id="wishViewImageTransform">
               <div id="wishViewImage" class="wish-view-image"></div>
               <img src="source/polaroid.png" alt="" class="wish-image-frame" id="wishFrameOverlay" />
             </div>

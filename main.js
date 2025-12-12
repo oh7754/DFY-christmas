@@ -756,7 +756,7 @@ const spotLight = new THREE.SpotLight(
   0xffe7e9,
   1,
   50,
-  Math.PI / 6,
+  Math.PI / 8,
   1,
   3
 );
@@ -818,7 +818,7 @@ postLightMarker.position.set(0, 0, 0);
  *  트리 & 레이어 셰이딩 (Star / Tree / Trunk / Snow)
  * ==========================================================================*/
 
-const treeHeight = 8;
+const treeHeight = 8.4;
 const treeRadius = 3.6;
 const TREE_CENTER_Y =1.7 + treeHeight / 2;
 
@@ -836,7 +836,7 @@ treeGroup.add(star);
 
 
 // 디버그용 소원 영역 콘
-const SHOW_WISH_CONE = true;
+const SHOW_WISH_CONE = false;
 if (SHOW_WISH_CONE) {
   const coneGeom = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
   const coneEdges = new THREE.EdgesGeometry(coneGeom);
@@ -862,9 +862,9 @@ const treeLayerMaterials = {
     metalness: 1,
     roughness: 0.4,
     emissive: 0xffb60c,
-    emissiveIntensity: 0.1,
+    emissiveIntensity: 0.2,
     bumpMap: treeNormalMap,
-    bumpScale: 0.05,
+    bumpScale: 0.1,
   }),
   foliage: new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -1105,7 +1105,7 @@ const snowTexture = createSnowParticleTexture();
 const snowMat = new THREE.PointsMaterial({
   map: snowTexture,
   color: 0xffffff,
-  size: 0.3,
+  size: 0.2,
   opacity:0.7,
   transparent: true,
   depthWrite: false,
@@ -1129,8 +1129,8 @@ function getRandomPositionOnTree() {
   const yTop    = tree.position.y + treeHeight / 2;
 
   // 🔹 높이 비율 범위 (0 = 바닥, 1 = 꼭대기)
-  const minN = 0.1;   // 바닥에서 60% 위
-  const maxN = 0.96;  // 꼭대기 바로 아래
+  const minN = 0.1;   // 바닥에서 ~% 위
+  const maxN = 0.78;  // 꼭대기 바로 아래
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // [minN, maxN] 사이에서 랜덤 높이 비율 선택
@@ -2243,14 +2243,14 @@ function animate(time) {
   );
 
 
-  const SPOT2_MAX = 6;
+  const SPOT2_MAX = 4;
   spotLight2.intensity = THREE.MathUtils.lerp(0, SPOT2_MAX, maxPostHover);
 
   // t는 위에서 const t = time * 0.001; 이런 식으로 이미 쓰고 있다고 가정
   const pulse = 0.5 + 0.5 * Math.sin(t * 3.0); // 3.0은 숨쉬기 속도
 
   // 🔹 항상 존재하는 기본 숨쉬기
-  const baseIntensity = 1;    // 기본 밝기
+  const baseIntensity = 0.5;    // 기본 밝기
   const basePulseAmp  = 0.25;   // 기본 숨쉬기 폭
 
   // 🔹 hover 되었을 때 추가로 얹을 숨쉬기

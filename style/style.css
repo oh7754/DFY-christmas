@@ -53,7 +53,7 @@ canvas {
 .top-bar {
   position: fixed;
   top: 16px;
-  left: 16px;
+  right: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -224,7 +224,7 @@ canvas {
 .side-panel {
   position: fixed;
   top: 100px;
-  left: 16px;
+  right: 16px;
   width: 392px;
   max-width: 100%;
   z-index: 30;
@@ -232,14 +232,15 @@ canvas {
   flex-direction: column;
   border-radius: 16px;
   height: min-content;
-  overflow: hidden;
   opacity: 0;
   box-shadow: inset 0 1px 1px #e5e7eb40;
   background: #ffffff10;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(32px);
   transform: translateX(0);
   transition: all 0.6s cubic-bezier(0.3, 0, 0, 1);
+  max-height: 80%;
 }
+
 
 .side-panel.open {
   transform: translateX(0);
@@ -289,12 +290,22 @@ canvas {
   color: #e5e7eb;
 }
 
+.wish-list-wrap {
+  width: 100%;
+  height: 100%;
+  max-height: 70dvh;
+  overflow: scroll;
+  scrollbar-color: #ffffff40 #ffffff00;
+  scrollbar-width: thin;
+}
+
 /* 내 소원 리스트 */
 .wish-list {
   padding-top: 8px;
   flex: 1;
   overflow-y: auto;
   padding-right: 4px;
+
 }
 
 .wish-list-empty {
@@ -361,6 +372,10 @@ canvas {
   font-size: 16px;
   padding: 4px;
   cursor: pointer;
+}
+
+.wish-delete:hover {
+  color: #ffffffff;
 }
 
 /* ========================
@@ -705,9 +720,9 @@ canvas {
   opacity: 1;
   transition: opacity 0.2s ease;
 }
-/* 토글 OFF 상태 */
 .wish-image-frame.frame-off {
   opacity: 0;
+  pointer-events: none;
 }
 
 /* ========================
@@ -875,75 +890,6 @@ canvas {
 }
 
 
-/* ========================
-   반응형 – 가로 폭 기준
-   ======================== */
-
-/* 태블릿 정도: 편지 폭만 살짝 줄이기 */
-@media (max-width: 1024px) {
-  .wish-letter,
-  .wish-view-letter {
-    width: min(720px, 100vw - 24px);
-  }
-}
-
-/* 모바일: 편지/텍스트/이미지 전체 스케일 + 레이아웃 변경
-   - 이미지 위쪽 중앙, 텍스트 아래쪽으로 스택 */
-@media (max-width: 640px) {
-  .wish-letter,
-  .wish-view-letter {
-    width: min(480px, 100vw - 16px);
-  }
-
-  .wish-letter-content,
-  .wish-view-letter-content {
-    padding: 14% 8% 12%;
-  }
-
-  /* 📌 모바일에서는 편지 아래 중앙에 붙이기 */
-  .wish-image-dropzone,
-  .wish-view-image {
-    position: fixed;
-    top: calc(50% + 42%);   /* 편지 중심보다 조금 아래 = 편지 아래쪽 */
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 72vw;
-    max-width: none;
-    aspect-ratio: 4 / 5;
-  }
-
-  .wish-text-area,
-  .wish-view-text-area {
-    top: 18%;
-    left: 8%;
-    right: 8%;
-    bottom: 18%;
-  }
-
-  .wish-input-name,
-  .wish-secret-label,
-  .wish-view-name {
-    font-size: 24px;
-  }
-
-  .wish-input-text,
-  .wish-view-body {
-    font-size: 18px;
-  }
-
-  .wish-privacy-toggle {
-    font-size: 14px;
-    height: 30px;
-    width: 80px;
-  }
-
-  .wish-like-bar {
-    left: 8%;
-    right: 8%;
-    transform: none;
-  }
-}
-
 
 /* ========================
    반응형 – 세로 높이 기준 (스케일 + 위치)
@@ -1000,5 +946,233 @@ canvas {
   .wish-letter.is-closing,
   .wish-view-letter.is-closing {
     transform: translate(-50%, -40%) scale(0.7);
+  }
+}
+
+
+/* =========================================
+   모바일 레이아웃 (max-width: 768px)
+   ========================================= */
+@media (max-width: 768px) {
+  /* 기본: 화면에 꽉차게, 스크롤은 오버레이에서만 나도록 */
+  body {
+    overflow: hidden;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+  }
+
+  /* 상단 바 & 프로필 영역 */
+  .top-bar {
+    padding: 10px 12px;
+  }
+
+  .top-account {
+    gap: 6px;
+  }
+
+  /* 모바일에서는 텍스트 줄이고 아이콘 위주로 */
+  .top-account-text {
+    display: none;
+  }
+
+  .menu-circle {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* 사이드 패널 (내가 올린 소원) */
+  .side-panel {
+    width: min(100%, 360px);
+    right: -100%;
+  }
+  .side-panel.open {
+    right: 0;
+  }
+
+  .side-inner {
+    padding: 16px 16px 24px;
+  }
+
+  .panel-section-header {
+    gap: 8px;
+  }
+
+  .panel-title {
+    font-size: 14px;
+  }
+
+  .btn.small {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .wish-list-wrap {
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wish-row {
+    padding: 8px 0;
+  }
+
+  .wish-thumb {
+    flex: 0 0 60px;
+    height: 60px;
+    border-radius: 8px;
+  }
+
+  .wish-text {
+    font-size: 13px;
+  }
+
+  .wish-date {
+    font-size: 11px;
+  }
+
+  .wish-like-inline {
+    font-size: 11px;
+  }
+
+  /* -------- 소원 작성 모달 (wishModal) -------- */
+  .wish-modal-inner {
+    padding: 0;
+    align-items: flex-end; /* 바닥에서 올라오는 시트 느낌 */
+  }
+
+  .wish-letter {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .wish-letter-bg {
+    width: 100%;
+    height: auto;
+  }
+
+  .wish-letter-content {
+    padding: 16px 14px 20px;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .wish-view-transform {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto 10px;
+  }
+
+  .wish-image-dropzone {
+    height: 46vw;           /* 화면 너비 비율 기준 높이 */
+    max-height: 220px;
+  }
+
+  .wish-image-placeholder p {
+    font-size: 12px;
+  }
+
+  .wish-text-area {
+    gap: 8px;
+  }
+
+  .wish-input-name {
+    font-size: 14px;
+  }
+
+  .wish-input-text {
+    min-height: 120px;
+    font-size: 14px;
+  }
+
+  .wish-actions {
+    margin-top: 8px;
+    gap: 8px;
+  }
+
+  .wish-btn,
+  .wish-privacy-toggle {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  /* 폴라로이드 토글 버튼 위치/사이즈 */
+  .polaroid-frame-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 999px;
+  }
+
+  /* 닫기 버튼 위치 조금 안쪽으로 */
+  .wish-close-circle {
+    top: 10px;
+    right: 10px;
+  }
+
+  /* -------- 소원 보기 모달 (wishPanel) -------- */
+  .wish-view-inner {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .wish-view-letter {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .wish-view-letter-bg {
+    width: 100%;
+    height: auto;
+  }
+
+  .wish-view-letter-content {
+    padding: 16px 14px 20px;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .wish-view-image {
+    height: 46vw;
+    max-height: 220px;
+  }
+
+  .wish-view-text-area {
+    max-height: 40vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .wish-view-name {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .wish-view-body p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .wish-like-bar {
+    margin-top: 8px;
+  }
+
+  .wish-like-btn {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .wish-like-count {
+    font-size: 13px;
   }
 }
