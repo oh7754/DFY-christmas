@@ -468,7 +468,11 @@ function openWishModal() {
 
 
   if (wishModal) {
-    wishModal.classList.remove("hidden");
+    // 열릴 때: hidden/closing 제거 후, 한 프레임 뒤에 showing 추가해서 배경 페이드 인
+    wishModal.classList.remove("hidden", "closing");
+    wishModal.classList.remove("showing");
+    void wishModal.offsetWidth;        // 강제 리플로우
+    wishModal.classList.add("showing");
   }
 
   if (wishLetter) {
@@ -479,11 +483,25 @@ function openWishModal() {
   }
 }
 
+
 function closeWishModal() {
   if (!wishModal) return;
 
-  const finishClose = () => {
+  const DURATION = 400; // 편지 애니메이션 / 배경 페이드 시간(ms)
+
+  // 배경 페이드 아웃
+  wishModal.classList.remove("showing");
+  wishModal.classList.add("closing");
+
+  if (wishLetter) {
+    wishLetter.classList.remove("is-open");
+    wishLetter.classList.add("is-closing");
+  }
+
+  // transitionend 에만 의존하지 않고, 일정 시간 후에 확실히 닫기
+  setTimeout(() => {
     wishModal.classList.add("hidden");
+    wishModal.classList.remove("closing");
 
     if (wishTextInput) wishTextInput.value = "";
     if (wishFileInput) wishFileInput.value = "";
@@ -494,24 +512,9 @@ function closeWishModal() {
       wishLetter.classList.remove("is-closing");
       wishLetter.classList.remove("is-open");
     }
-  };
-
-  if (!wishLetter) {
-    finishClose();
-    return;
-  }
-
-  wishLetter.classList.remove("is-open");
-  wishLetter.classList.add("is-closing");
-
-  const onTransitionEnd = (e) => {
-    if (e.target !== wishLetter) return;
-    wishLetter.removeEventListener("transitionend", onTransitionEnd);
-    finishClose();
-  };
-
-  wishLetter.addEventListener("transitionend", onTransitionEnd);
+  }, DURATION);
 }
+
 
 if (openWishModalBtn) {
   openWishModalBtn.addEventListener("click", openWishModal);
@@ -1693,17 +1696,23 @@ function showWishPanel(data) {
     }
   }
 
-  // ✅ 이 소원에 프레임을 썼는지 여부 (기본값: true)
-  const useFrame = data.usePolaroidFrame !== false;
-  if (frameOverlayView) {
+  // ✅ 폴라로이드 프레임 ON/OFF
+  if (typeof frameOverlayView !== "undefined" && frameOverlayView) {
+    const useFrame = data.usePolaroidFrame !== false; // 기본값: true
     frameOverlayView.classList.toggle("frame-off", !useFrame);
   }
 
   currentOpenedWishId = data.id || null;
   refreshLikeUI().catch((e) => console.error("refreshLikeUI error", e));
 
+  // ✅ 모달 열기: 배경 페이드인 + 편지 카드 애니메이션
   if (wishPanel) {
-    wishPanel.classList.remove("hidden");
+    // 닫히는 중일 수 있으니 상태 먼저 리셋
+    wishPanel.classList.remove("hidden", "closing");
+    wishPanel.classList.remove("showing");
+    // 강제 리플로우로 transition 제대로 트리거
+    void wishPanel.offsetWidth;
+    wishPanel.classList.add("showing");
   }
 
   if (wishViewLetter) {
@@ -1715,37 +1724,63 @@ function showWishPanel(data) {
 }
 
 
+
+
 function closeWishPanelPanelOnly() {
   if (!wishPanel) return;
 
-  const finishClose = () => {
+  const DURATION = 400; // CSS 트랜지션 시간과 맞춰주기
+
+  // 🔻 배경 페이드아웃
+  wishPanel.classList.remove("showing");
+  wishPanel.classList.add("closing");
+
+  // 🔻 편지 카드 애니메이션
+  if (wishViewLetter) {
+    wishViewLetter.classList.remove("is-open");
+    wishViewLetter.classList.add("is-closing");
+  }
+
+  // 일정 시간 뒤에 완전히 닫기
+  setTimeout(() => {
     wishPanel.classList.add("hidden");
+    wishPanel.classList.remove("closing");
+
     if (wishViewLetter) {
       wishViewLetter.classList.remove("is-closing");
       wishViewLetter.classList.remove("is-open");
     }
-  };
-
-  if (!wishViewLetter) {
-    finishClose();
-    return;
-  }
-
-  wishViewLetter.classList.remove("is-open");
-  wishViewLetter.classList.add("is-closing");
-
-  const onTransitionEnd = (e) => {
-    if (e.target !== wishViewLetter) return;
-    wishViewLetter.removeEventListener("transitionend", onTransitionEnd);
-    finishClose();
-  };
-
-  wishViewLetter.addEventListener("transitionend", onTransitionEnd);
+  }, DURATION);
 }
+
 
 if (wishCloseBtn) {
+  // X 버튼 눌렀을 때 닫기
   wishCloseBtn.addEventListener("click", closeWishPanelPanelOnly);
 }
+
+if (wishPanel) {
+  wishPanel.addEventListener("click", (e) => {
+    // wishPanel 자체나 .modal-backdrop 을 눌렀을 때만 닫기
+    if (
+      e.target === wishPanel ||
+      e.target.classList.contains("modal-backdrop")
+    ) {
+      closeWishPanelPanelOnly();
+    }
+  });
+}
+
+// 편지 밖(블러 영역)을 클릭해도 닫히도록
+if (wishPanel) {
+  wishPanel.addEventListener("click", (e) => {
+    // wishPanel 자체나 .modal-backdrop 을 눌렀을 때만 닫기
+    if (e.target === wishPanel || e.target.classList.contains("modal-backdrop")) {
+      closeWishPanelPanelOnly();
+    }
+  });
+}
+
 
 /* ============================================================================
  *  좋아요 UI & 토글
