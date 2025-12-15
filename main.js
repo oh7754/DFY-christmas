@@ -708,6 +708,7 @@ worldColorMap.flipY = false;
 const worldBumpMap = textureLoader.load("source/world_Bump.png");
 worldBumpMap.colorSpace = THREE.NoColorSpace;
 worldBumpMap.flipY = false;
+  
 
 /* ============================================================================
  *  바닥 (World)

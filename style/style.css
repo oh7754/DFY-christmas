@@ -985,7 +985,8 @@ canvas {
   .top-bar {
     padding: 10px 12px;
     top: 0;
-    right: 0;
+    left: 0;
+    right: auto;
   }
 
   .top-account {
@@ -1274,7 +1275,7 @@ canvas {
   .wish-view-letter .wish-like-bar {
     position: absolute;
     left: 50%;
-    bottom: 180px;
+    bottom: 60px;
     width: auto;
     transform: translateX(-50%);
     display: flex;
@@ -1289,6 +1290,7 @@ canvas {
 
   .wish-view-letter .wish-like-count {
     font-size: 13px;
+    bottom: 20px;
   }
 
   /* 보기 모달의 닫기 버튼 위치 (카드 기준) */
