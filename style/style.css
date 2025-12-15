@@ -156,7 +156,29 @@ canvas {
   margin-top: 4px;
   font-size: 12px;
   opacity: 0.4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.logout-link{
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.logout-link:hover{
+  opacity: 1;
+}
+
+.logout-link.hidden{
+  display: none;
+}
+
 
 /* ========================
    햄버거 / X 버튼
@@ -265,6 +287,7 @@ canvas {
   font-size: 18px;
   font-weight: 600;
 }
+
 
 /* 버튼 공통 */
 .btn {
@@ -510,12 +533,17 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(3px);
+  /* backdrop-filter: blur(12px); */
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,
     background 0.2s ease,
     transform 0.15s ease;
+}
+
+.wish-image-dropzone:hover {
+  box-shadow: inset 0 0 12px #ffffff40;
+  background-color: #ffffff10;
 }
 
 
@@ -699,6 +727,13 @@ canvas {
   text-align: center;
 }
 
+#wishContent {
+  margin: 0;                 /* p 기본 마진 제거(원하면) */
+  white-space: pre-wrap;     /* 엔터는 살리고, 자동 줄바꿈도 허용 */
+  word-break: keep-all;      /* ✅ 띄어쓰기 기준으로 줄바꿈(한글에도 깔끔) */
+  overflow-wrap: break-word; /* 아주 긴 단어/URL만 예외로 잘라줌 */
+}
+
 /* 비활성(익명 모드일 때 등) 공통 */
 .wish-input-disabled {
   opacity: 0.7;
@@ -829,12 +864,12 @@ canvas {
 .wish-privacy-toggle,
 .wish-btn-primary {
   min-width: 100px;
-  padding: 8px 14px;
-  font-size: 16px;
+  padding: 10px 22px;
+  font-size: 18px;
   border-radius: 999px;
   border: none;
   cursor: pointer;
-  display: inline-flex;
+  /* display: inline-flex; */
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -858,16 +893,23 @@ canvas {
 /* 폴라로이드 프레임 토글 (색/위치만 개별) */
 .polaroid-frame-btn {
   position: absolute;
-  left: 5%;
-  bottom: -9%;
-  background-color: #fef100;
-  color: #111827;
+  left: 3%;
+  bottom: -10%;
+  background-color: #cbcbcb40;
+  color: #000000;
+  box-shadow: inset 0 1px 1px #e5e7eb40;
+  backdrop-filter: blur(12px);
 }
 
 /* 비밀소원 토글 */
 .wish-privacy-toggle {
-  background-color: rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.55);
+  background-color: #00000000;
+  color: #00000099;
+  backdrop-filter: none;
+}
+
+.wish-privacy-toggle:hover {
+  color: #000000ff;
 }
 
 /* 소원 올리기 버튼 */
@@ -876,25 +918,52 @@ canvas {
   color: #000110;
 }
 
-.wish-like-bar {
-  bottom: 28%;
-  left: 0%;
-  width: 100%;
+/* ✅ 하트 + 카운트 수직정렬 안정화 */
+.wish-like-bar{
+   /* 기존 유지 */
+  bottom: 25%;
+  right: 19%;
+  /* width: 100%; */
   position: absolute;
   text-align: center;
-  /* background-color: #22c55e; */
+
+  display: inline-flex;
+  align-items: center;   /* 수직 중앙 */
+  gap: 6px;
+  line-height: 1;        /* baseline 흔들림 제거 */
+  opacity: 0.6 ;
 }
 
-.wish-like-count {
+.wish-like-btn{
+  display: inline-flex;
+  align-items: center;   /* 버튼 내부도 중앙 */
+  justify-content: center;
+  line-height: 1;
+  list-style: none;
+  border: none;
+  background-color: #00000000;
+    opacity: 0.4; 
+}
+
+.wish-like-btn .like-icon{
+  display: block;        /* img baseline 제거 */
+  height: 24px;
+  width: 24px;
+  fill: #111827;
+
+}
+
+.wish-like-count{
+  display: inline-flex;  /* 숫자도 flex로 중앙 */
+  align-items: center;
+  line-height: 1;
   font-size: 18px;
   color: #111827;
 }
 
-/* 내 소원 리스트에서 좋아요 숫자 */
-.wish-like-inline {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #f97373;
+
+.wish-like-btn.liked{
+  opacity: 1;                    /* ✅ 눌림 */
 }
 
 
@@ -921,23 +990,18 @@ canvas {
     gap: 6px;
   }
 
-  /* 모바일에서는 텍스트 줄이고 아이콘 위주로 */
   .top-account-text {
+    display: block;   /* ✅ 모바일에서도 로그인 정보 보이게 */
+    min-width: 300px;
+    opacity: 0;
+  }
+  
+  .menu-circle{
     display: none;
   }
-
-  .menu-circle {
-    width: 40px;
-    height: 40px;
-  }
-
   /* 사이드 패널 (내가 올린 소원) */
-  .side-panel {
-    width: min(100%, 360px);
-    right: -100%;
-  }
-  .side-panel.open {
-    right: 0;
+  .side-panel{
+    display: none !important;
   }
 
   .side-inner {
@@ -950,6 +1014,20 @@ canvas {
 
   .panel-title {
     font-size: 14px;
+  }
+
+    /* ✅ collapsed여도 텍스트 보이게 */
+  .top-account.collapsed{
+    overflow: hidden;
+  }
+  .top-account.collapsed .top-account-text{
+    opacity: 1;
+  }
+  .top-account.expanded{
+    width: min(320px, calc(100vw - 24px));
+  }
+  .top-account{
+    max-width: calc(100vw - 24px);
   }
 
   .btn.small {
@@ -1151,7 +1229,7 @@ canvas {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    /* box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); */
   }
 
   /* 폴라로이드 프레임 PNG
@@ -1169,7 +1247,7 @@ canvas {
     position: absolute;
     left: 50%;
     bottom: 15%;
-    width: 78%;
+    width: 60%;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
@@ -1180,12 +1258,12 @@ canvas {
   }
 
   .wish-view-name {
-    font-size: 24px;
+    font-size: 22px;
     margin-bottom: 2px;
   }
 
   .wish-view-body {
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1.6;
     margin-top: 0;
   }
@@ -1205,7 +1283,6 @@ canvas {
 
   .wish-view-letter .wish-like-btn {
     font-size: 13px;
-    padding: 8px 12px;
   }
 
   .wish-view-letter .wish-like-count {

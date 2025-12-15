@@ -103,18 +103,10 @@ const dropPreview = dropzone
   ? dropzone.querySelector(".wish-image-preview")
   : null;
 
-// 폴라로이드 프레임 / 토글 버튼
+  // ✅ 폴라로이드 프레임 토글 관련
 const polaroidFrameBtn = document.getElementById("polaroidFrameBtn");
-
-// 작성 영역 안의 폴라로이드 이미지
-const frameOverlayWrite = document.querySelector(
-  "#wishDropzoneTransform .wish-image-frame"
-);
-
-// 보기(소원 패널) 안의 폴라로이드 이미지
-const frameOverlayView = document.querySelector(
-  "#wishViewImageTransform .wish-image-frame"
-);
+const frameOverlayWrite = document.getElementById("wishFrameOverlayWrite"); // 작성 모달
+const frameOverlayView  = document.getElementById("wishFrameOverlayView");  // 열람 모달
 
 
 /* ============================================================================
@@ -194,10 +186,6 @@ let currentOpenedWishId = null;
 // 익명 여부 (토글 버튼으로 관리)
 let isAnonymousState = false;
 
-// 폴라로이드 프레임 사용 여부 (작성 시 기준)
-let isPolaroidOn = true;
-
-
 // 트리 이미지 mesh → 데이터 매핑 (클릭용)
 const imageMeshes = [];
 const meshToData = new Map();
@@ -208,6 +196,25 @@ const hangingObjects = [];
 // 트리에 걸린 카드 위치들 (겹침 방지용)
 const cardPositions = [];
 
+// ===== 트리 카드 글로벌 스케일 설정 (개수에 따라 단계적으로 조정) =====
+
+// 여기 값들만 바꾸면 전체 카드 스케일 정책을 쉽게 조정할 수 있습니다.
+const CARD_SCALE_STEPS = [
+  // maxCount 이하일 때 scale 적용
+  { maxCount: 20, scale: 1.0 },      // 1~20장까지는 1.0
+  { maxCount: 40, scale: 0.85 },      // 21~40장은 0.8
+  { maxCount: 80, scale: 0.7 },      // 41~80장은 0.6
+  { maxCount: Infinity, scale: 0.6 }, // 81장 이상도 0.6 (원하면 수정)
+];
+
+// 현재 걸려 있는 카드 개수(hangingObjects.length)를 기준으로 전역 스케일을 리턴
+function getTreeCardScale() {
+  const count = hangingObjects.length;
+  for (const step of CARD_SCALE_STEPS) {
+    if (count <= step.maxCount) return step.scale;
+  }
+  return 1.0;
+}
 
 /* ============================================================================
  *  유틸 함수
@@ -293,6 +300,32 @@ onAuthStateChanged(auth, async (user) => {
   renderMyWishes();
 });
 
+// ✅ 폴라로이드 프레임 상태 (기본 ON)
+let isPolaroidOn = false;
+
+function updatePolaroidWriteUI() {
+  // 버튼 텍스트
+  if (polaroidFrameBtn) {
+    polaroidFrameBtn.textContent = isPolaroidOn ? "프레임 끄기" : "프레임 켜기";
+  }
+
+  // 작성 모달 프레임 보이기/숨기기
+  if (frameOverlayWrite) {
+    frameOverlayWrite.classList.toggle("frame-off", !isPolaroidOn);
+  }
+}
+
+// ✅ 버튼 클릭으로 프레임 토글
+if (polaroidFrameBtn) {
+  polaroidFrameBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isPolaroidOn = !isPolaroidOn;
+    updatePolaroidWriteUI();
+  });
+}
+
+
 /* ============================================================================
  *  소원 작성 – 이미지 드롭존/클릭 업로드
  * ==========================================================================*/
@@ -345,28 +378,6 @@ function setDropzoneFile(file) {
   dropzone.classList.add("has-image");
 }
 
-function updatePolaroidWriteUI() {
-  // 작성 모달 안 프레임 숨기기 / 보이기
-  if (frameOverlayWrite) {
-    frameOverlayWrite.classList.toggle("frame-off", !isPolaroidOn);
-  }
-
-  // 버튼 텍스트도 상태에 따라 변경 (원하는 문구로 바꿔도 됨)
-  if (polaroidFrameBtn) {
-    polaroidFrameBtn.textContent = isPolaroidOn ? "프레임 끄기" : "프레임 켜기";
-  }
-}
-
-if (polaroidFrameBtn) {
-  polaroidFrameBtn.addEventListener("click", () => {
-    isPolaroidOn = !isPolaroidOn;
-    updatePolaroidWriteUI();
-  });
-}
-
-
-
-
 /* ============================================================================
  *  상단 프로필 & 사이드 패널
  * ==========================================================================*/
@@ -386,27 +397,6 @@ function closePanel() {
   topAccount.classList.remove("expanded");
   menuToggle.classList.remove("open");
 }
-
-// ─────────────────────────────
-// 사이드 패널: 바깥 영역 클릭 시 닫기
-// ─────────────────────────────
-document.addEventListener("click", (e) => {
-  if (!sidePanel) return;
-  if (!sidePanel.classList.contains("open")) return;
-
-  const target = e.target;
-
-  // 사이드패널 내부 클릭이면 유지
-  if (sidePanel.contains(target)) return;
-
-  // 햄버거 버튼 / 상단 프로필 클릭이면 유지
-  if (menuToggle && menuToggle.contains(target)) return;
-  if (topAccount && topAccount.contains(target)) return;
-
-  // 그 외 모든 영역 클릭 → 패널 닫기
-  closePanel();
-});
-
 
 if (menuToggle) {
   menuToggle.addEventListener("click", () => {
@@ -436,6 +426,7 @@ if (topAccount) {
   });
   topAccount.classList.add("collapsed");
 }
+
 
 /* ============================================================================
  *  소원 업로드 모달 (열기 / 닫기 / 이름 자동완성 / 익명 스타일)
@@ -481,9 +472,9 @@ function openWishModal() {
     resizeWishNameInput();
   }
 
-  // 기본은 실명 + 프레임 ON
+  // 기본은 실명 + 프레임 OFF
   setPrivacyUI(false);
-  isPolaroidOn = true;
+  isPolaroidOn = false;
   updatePolaroidWriteUI();
 
   if (wishTextInput) wishTextInput.value = "";
@@ -836,7 +827,7 @@ postLightMarker.position.set(0, 0, 0);
  *  트리 & 레이어 셰이딩 (Star / Tree / Trunk / Snow)
  * ==========================================================================*/
 
-const treeHeight = 8.4;
+const treeHeight = 8;
 const treeRadius = 3.6;
 const TREE_CENTER_Y =1.7 + treeHeight / 2;
 
@@ -950,8 +941,8 @@ function getLayerIdFromHierarchy(obj) {
 
 // 버텍스 컬러 그라디언트 + 레이어 컬러
 function applyLayerShading(root) {
-  const greenTop = new THREE.Color(0x003937);
-  const greenBottom = new THREE.Color(0x3fac00);
+  const greenTop = new THREE.Color(0x3fac00);
+  const greenBottom = new THREE.Color(0x003937);
 
   const brownTop = new THREE.Color(0x5f4000);
   const brownBottom = new THREE.Color(0x2b0800);
@@ -1140,7 +1131,7 @@ scene.add(snow);
 
 function getRandomPositionOnTree() {
   const maxAttempts = 25;    // 최대 시도 횟수
-  const minDist = 1.6;       // 카드끼리 최소 거리
+  const minDist = 1;       // 카드끼리 최소 거리
 
   // 트리 바닥 / 꼭대기 기준
   const yBottom = tree.position.y - treeHeight / 2;
@@ -1148,7 +1139,7 @@ function getRandomPositionOnTree() {
 
   // 🔹 높이 비율 범위 (0 = 바닥, 1 = 꼭대기)
   const minN = 0.1;   // 바닥에서 ~% 위
-  const maxN = 0.78;  // 꼭대기 바로 아래
+  const maxN = 0.86;  // 꼭대기 바로 아래
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // [minN, maxN] 사이에서 랜덤 높이 비율 선택
@@ -1193,9 +1184,11 @@ function addImageToTree(docId, data) {
       // 2. 우리가 만들 카드 프레임은 정사각형이라고 가정 (1:1)
       const planeAspect = 1; // 정사각형
 
-      // 3. geometry도 정사각형으로 (폴라로이드 프레임과 맞추기용)
-      const size = 1;              // 기본 한 변 길이
+      // 3. geometry는 항상 같은 크기 (스케일은 나중에 한 번에)
+      const BASE_SIZE = 1;          // 기준 카드 한 변 길이
+      const size = BASE_SIZE;       // 카드마다 동일
       const geo = new THREE.PlaneGeometry(size, size);
+
 
       // 4. CSS의 background-size: cover + center 와 같은 효과
       texture.wrapS = THREE.ClampToEdgeWrapping;
@@ -1798,18 +1791,19 @@ document.addEventListener("click", (e) => {
 function bindModalOuterClick(modalEl, contentEl, closeFn) {
   if (!modalEl || !closeFn) return;
 
-  modalEl.addEventListener("click", (e) => {
-    const target = e.target;
-    if (contentEl && contentEl.contains(target)) return;
-    closeFn();
+  modalEl.addEventListener("mousedown", (e) => {
+    // 클릭 시작 시 내부 클릭 여부 체크
+    modalEl.dataset.clickingInside = contentEl && contentEl.contains(e.target);
   });
 
-  if (contentEl) {
-    contentEl.addEventListener("click", (e) => {
-      e.stopPropagation();
-    });
-  }
+  modalEl.addEventListener("click", (e) => {
+    const clickedInside = modalEl.dataset.clickingInside === "true";
+    modalEl.dataset.clickingInside = "false";
+    if (clickedInside) return; // 내부 클릭이면 무시
+    closeFn();
+  });
 }
+
 
 // ✉️ 소원 작성 모달 – 바깥 클릭 닫기
 bindModalOuterClick(wishModal, wishLetter, closeWishModal);
@@ -1818,57 +1812,72 @@ bindModalOuterClick(wishModal, wishLetter, closeWishModal);
 bindModalOuterClick(wishPanel, wishViewLetter, closeWishPanelPanelOnly);
 
 /* ============================================================================
- *  좋아요 UI & 토글
+ *  좋아요 UI & 토글 (하트 아이콘 + 카운트만)
+ *  - 로그인 안 해도 하트는 그대로 보임
+ *  - 로그인 안 한 상태에서 클릭하면 로그인 팝업 → 성공하면 바로 좋아요 토글까지 진행
+ *  - 내 좋아요 여부만 체크 (liked 클래스/opacity 2상태)
  * ==========================================================================*/
+
+function getWishDocRef(wishId) {
+  return doc(db, "treeImages", wishId);
+}
+
+function getLikeDocRef(wishId, uid) {
+  return doc(db, "treeImages", wishId, "likes", uid);
+}
 
 async function refreshLikeUI() {
   if (!currentOpenedWishId || !wishLikeBtn || !wishLikeCountEl) return;
 
-  const imgRef = doc(db, "treeImages", currentOpenedWishId);
+  // 1) 카운트
+  const imgRef = getWishDocRef(currentOpenedWishId);
   const imgSnap = await getDoc(imgRef);
   if (!imgSnap.exists()) return;
 
   const data = imgSnap.data();
-  const count = data.likesCount || 0;
-  wishLikeCountEl.textContent = count;
+  wishLikeCountEl.textContent = data.likesCount || 0;
 
+  // 2) 내 좋아요 여부(로그인 시에만 확인)
   if (!currentUser) {
-    wishLikeBtn.classList.add("disabled");
-    wishLikeBtn.disabled = true;
-    wishLikeBtn.textContent = "♡ 로그인 필요";
+    wishLikeBtn.classList.remove("liked");
+    wishLikeBtn.dataset.liked = "0";
+    wishLikeBtn.disabled = false;
+    wishLikeBtn.classList.remove("disabled");
+    wishLikeBtn.setAttribute("aria-pressed", "false");
     return;
   }
 
-  const likeRef = doc(
-    db,
-    "treeImages",
-    currentOpenedWishId,
-    "likes",
-    currentUser.uid
-  );
+  const likeRef = getLikeDocRef(currentOpenedWishId, currentUser.uid);
   const likeSnap = await getDoc(likeRef);
   const hasLiked = likeSnap.exists();
 
-  wishLikeBtn.classList.remove("disabled");
-  wishLikeBtn.disabled = false;
+  wishLikeBtn.classList.toggle("liked", hasLiked);
   wishLikeBtn.dataset.liked = hasLiked ? "1" : "0";
-  wishLikeBtn.textContent = hasLiked ? "♥ 좋아요 취소" : "♡ 좋아요";
+  wishLikeBtn.disabled = false;
+  wishLikeBtn.classList.remove("disabled");
+  wishLikeBtn.setAttribute("aria-pressed", hasLiked ? "true" : "false");
 }
 
 async function toggleLike() {
-  if (!currentUser || !currentOpenedWishId) {
-    alert("로그인 후 좋아요를 누를 수 있어요.");
-    return;
+  if (!currentOpenedWishId) return;
+
+  // 로그인 안 했으면 → 로그인 팝업
+  if (!currentUser) {
+    try {
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged에서 currentUser 세팅될 수 있으니 UI 먼저 동기화
+      await refreshLikeUI();
+    } catch (err) {
+      console.error("로그인 실패", err);
+      return;
+    }
   }
 
-  const imgRef = doc(db, "treeImages", currentOpenedWishId);
-  const likeRef = doc(
-    db,
-    "treeImages",
-    currentOpenedWishId,
-    "likes",
-    currentUser.uid
-  );
+  if (!currentUser) return; // 로그인 취소
+
+  const wishId = currentOpenedWishId;
+  const imgRef = getWishDocRef(wishId);
+  const likeRef = getLikeDocRef(wishId, currentUser.uid);
 
   try {
     await runTransaction(db, async (tx) => {
@@ -1882,18 +1891,13 @@ async function toggleLike() {
 
       if (likeSnap.exists()) {
         tx.delete(likeRef);
-        tx.update(imgRef, {
-          likesCount: Math.max(currentCount - 1, 0),
-        });
+        tx.update(imgRef, { likesCount: Math.max(currentCount - 1, 0) });
       } else {
         tx.set(likeRef, {
           userUid: currentUser.uid,
-          email: currentUser.email,
           createdAt: serverTimestamp(),
         });
-        tx.update(imgRef, {
-          likesCount: currentCount + 1,
-        });
+        tx.update(imgRef, { likesCount: currentCount + 1 });
       }
     });
 
@@ -1905,8 +1909,13 @@ async function toggleLike() {
 }
 
 if (wishLikeBtn) {
-  wishLikeBtn.addEventListener("click", toggleLike);
+  wishLikeBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleLike();
+  });
 }
+
 
 /* ============================================================================
  *  입력 상태 (마우스 / 터치 / 자이로)
@@ -2224,33 +2233,29 @@ function animate(time) {
   pos.needsUpdate = true;
 
 
-  // 소원 카드 펜듈럼 + 등장/퇴장 스케일
+  // 소원 카드 펜듈럼 + 등장/퇴장 + 전역 스케일
+  const globalCardScale = getTreeCardScale();   // ✅ 여기서 한 번만 계산
+
   for (let i = hangingObjects.length - 1; i >= 0; i--) {
     const ho = hangingObjects[i];
+
+    // 물리(진자)
     const k = ho.stiffness;
     const d = ho.damping;
-
-    // 펜듈럼 스윙
     ho.vel += -k * ho.angle * delta;
     ho.vel -= ho.vel * d * delta;
     ho.angle += ho.vel * delta;
     ho.hanger.quaternion.setFromAxisAngle(ho.axis, -ho.angle);
 
-    // 스케일 애니메이션 (0 ↔ 1)
+    // 스케일 애니메이션 (0 → 1)
     const scaleDamp = 6;
     const sLerp = 1 - Math.exp(-scaleDamp * delta);
     ho.scale = ho.scale + (ho.targetScale - ho.scale) * sLerp;
-    ho.hanger.scale.setScalar(ho.scale);
 
-    // 삭제 예약된 카드: 충분히 작아지면 실제로 제거
-    if (ho.toRemove && ho.scale < 0.02) {
-      if (ho.hanger.parent) {
-        ho.hanger.parent.remove(ho.hanger);
-      }
-      cleanupCardById(ho.id);
-      hangingObjects.splice(i, 1);
-    }
+    // ✅ 등장/퇴장 스케일(ho.scale)에 전역 스케일(globalCardScale)을 곱해서 적용
+    ho.hanger.scale.setScalar(ho.scale * globalCardScale);
   }
+
 
   // 트리 전구 깜빡임
   const t2 = time * 0.001;
