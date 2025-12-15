@@ -2134,11 +2134,12 @@ function setupGyroButton() {
   btn.style.transform = "translateX(-50%)";
   btn.style.position = "fixed";
   btn.style.zIndex = "9999";
-  btn.style.padding = "8px 12px";
+  btn.style.padding = "8px 18px";
   btn.style.borderRadius = "20px";
   btn.style.border = "none";
-  btn.style.fontSize = "12px";
-  btn.style.background = "rgba(0,0,0,0.6)";
+  btn.style.fontSize = "16px";
+  btn.style.background = "rgba(253, 253, 253, 0.1)";
+  btn.style.boxShadow = "inset 0 1px 1px #e5e7eb40";
   btn.style.color = "#fff";
   btn.style.backdropFilter = "blur(10px)";
   btn.style.cursor = "pointer";
