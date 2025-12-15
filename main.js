@@ -2035,20 +2035,22 @@ function moveDrag(clientX) {
 
 
 renderer.domElement.addEventListener("mousedown", (event) => {
+  if (isMobile) return;
   beginDrag(event.clientX);
 });
 
 window.addEventListener("mouseup", () => {
+  if (isMobile) return;
   isDragging = false;
 });
 
 window.addEventListener("mousemove", (event) => {
+  if (isMobile) return;
+
   mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
-  if (isDragging) {
-    moveDrag(event.clientX);
-  }
+  if (isDragging) moveDrag(event.clientX);
 });
 
 renderer.domElement.addEventListener(
@@ -2134,11 +2136,11 @@ function setupGyroButton() {
   btn.style.transform = "translateX(-50%)";
   btn.style.position = "fixed";
   btn.style.zIndex = "9999";
-  btn.style.padding = "8px 18px";
+  btn.style.padding = "9px 18px";
   btn.style.borderRadius = "20px";
   btn.style.border = "none";
   btn.style.fontSize = "16px";
-  btn.style.background = "rgba(253, 253, 253, 0.1)";
+  btn.style.background = "rgba(102, 102, 102, 0.1)";
   btn.style.boxShadow = "inset 0 1px 1px #e5e7eb40";
   btn.style.color = "#fff";
   btn.style.backdropFilter = "blur(10px)";
