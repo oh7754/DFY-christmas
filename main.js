@@ -492,10 +492,8 @@ function openWishModal() {
     alert("먼저 사내 구글 계정으로 로그인 해주세요.");
     return;
   }
-    // before
-  isPolaroidOn = true;
-
-  // after (기본 OFF)
+  // 기본은 실명 + 프레임 OFF
+  setPrivacyUI(false);
   isPolaroidOn = false;
   updatePolaroidWriteUI();
 
@@ -547,8 +545,6 @@ function closeWishModal() {
   wishModal.classList.remove("showing");
   wishModal.classList.add("closing");
 
-  wishModal.classList.remove("closing");
-
   const finishClose = () => {
     // 완전히 닫힌 상태
     wishModal.classList.add("hidden");
@@ -562,6 +558,8 @@ function closeWishModal() {
     if (wishLetter) {
       wishLetter.classList.remove("is-closing");
       wishLetter.classList.remove("is-open");
+
+      wishModal.classList.remove("closing");
     }
   };
 
@@ -879,8 +877,8 @@ postLightMarker.position.set(0, 0, 0);
  *  트리 & 레이어 셰이딩 (Star / Tree / Trunk / Snow)
  * ==========================================================================*/
 
-const treeHeight = 8;
-const treeRadius = 3.6;
+const treeHeight = 8.2;
+const treeRadius = 3.65;
 const TREE_CENTER_Y =1.7 + treeHeight / 2;
 
 // 굳이 window에 올릴 필요 없이 그냥 로컬 그룹 하나 생성
@@ -1145,7 +1143,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
  *  눈 파티클
  * ==========================================================================*/
 
-const snowCount = 500;
+const snowCount = 400;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
 // ❗ 각 눈 파티클마다 떨어지는 속도 따로 저장
@@ -1183,7 +1181,7 @@ scene.add(snow);
 
 function getRandomPositionOnTree() {
   const maxAttempts = 25;    // 최대 시도 횟수
-  const minDist = 1;       // 카드끼리 최소 거리
+  const minDist = 1.3;       // 카드끼리 최소 거리
 
   // 트리 바닥 / 꼭대기 기준
   const yBottom = tree.position.y - treeHeight / 2;
@@ -1407,14 +1405,17 @@ onSnapshot(q, (snapshot) => {
     const data = docSnap.data();
 
     if (change.type === "added") {
+      if (!data.url) return;                 // ✅ url 없으면 스킵
       if (shownImageIds.has(id)) return;
       shownImageIds.add(id);
-      if (data.url) addImageToTree(id, data);
-    } else if (change.type === "removed") {
-      // 🔹 Firestore에서 삭제되면 트리 카드도 천천히 사라지게
-      startRemoveCard(id);
+      addImageToTree(id, data);
+
     } else if (change.type === "modified") {
-      // 지금은 텍스트/좋아요만 바뀌니 3D카드는 그대로 둬도 OK
+      // ✅ 과거 꼬인 문서(처음엔 url 없었음)가 나중에 url 생기는 경우도 트리에 추가
+      if (data.url && !shownImageIds.has(id)) {
+        shownImageIds.add(id);
+        addImageToTree(id, data);
+      }
     }
   });
 
@@ -1462,8 +1463,8 @@ function cleanupCardById(docId) {
  * ==========================================================================*/
 
 function compressImage(file) {
-  const MAX_WIDTH = 1920;
-  const MAX_HEIGHT = 1920;
+  const MAX_WIDTH = 1080;
+  const MAX_HEIGHT = 1080;
   const MAX_MB = 1.5;
 
   const sizeMB = file.size / (1024 * 1024);
@@ -1658,15 +1659,23 @@ async function handleDeleteImage(docId, data) {
   if (!ok) return;
 
   try {
+    // 1) 스토리지는 "시도"만 하고, 실패해도 문서 삭제는 진행
     if (data.path) {
-      const fileRef = ref(storage, data.path);
-      await deleteObject(fileRef);
+      try {
+        const fileRef = ref(storage, data.path);
+        await deleteObject(fileRef);
+      } catch (e) {
+        console.warn("스토리지 파일 삭제 실패(무시하고 문서 삭제 진행):", e);
+      }
     }
+
+    // 2) Firestore 문서는 무조건 삭제 시도
     await deleteDoc(doc(imagesCol, docId));
   } catch (err) {
     console.error("삭제 실패", err);
     alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
   }
+
 }
 
 /* ============================================================================
@@ -2118,9 +2127,12 @@ function setupGyroButton() {
 
   const btn = document.createElement("button");
   btn.textContent = "📱 기울여서 보기";
+  btn.style.top = "auto";
+  btn.style.left = "50%";
+  btn.style.right = "auto";
+  btn.style.bottom = "calc(env(safe-area-inset-bottom) + 16px)";
+  btn.style.transform = "translateX(-50%)";
   btn.style.position = "fixed";
-  btn.style.top = "16px";
-  btn.style.left = "16px";
   btn.style.zIndex = "9999";
   btn.style.padding = "8px 12px";
   btn.style.borderRadius = "20px";
@@ -2147,9 +2159,8 @@ function setupGyroButton() {
       useGyro = true;
       window.addEventListener("deviceorientation", handleOrientation, true);
 
-      btn.textContent = "📱 기울여서 보기 ON";
+      btn.style.display = "none";
       btn.disabled = true;
-      btn.style.opacity = "0.6";
     } catch (err) {
       console.error("gyro permission error", err);
       alert("자이로 권한 요청 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");

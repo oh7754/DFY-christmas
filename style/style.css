@@ -249,7 +249,7 @@ canvas {
   right: 16px;
   width: 392px;
   max-width: 100%;
-  z-index: 30;
+  z-index: 999;
   display: flex;
   flex-direction: column;
   border-radius: 16px;
@@ -984,6 +984,8 @@ canvas {
   /* 상단 바 & 프로필 영역 */
   .top-bar {
     padding: 10px 12px;
+    top: 0;
+    right: 0;
   }
 
   .top-account {
@@ -992,7 +994,7 @@ canvas {
 
   .top-account-text {
     display: block;   /* ✅ 모바일에서도 로그인 정보 보이게 */
-    min-width: 300px;
+    min-width: 240px;
     opacity: 0;
   }
   
