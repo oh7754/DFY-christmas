@@ -33,6 +33,17 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
+// ✅ device / platform flags (used across input + render tuning)
+const IS_WIN = /Win/.test(navigator.platform);
+const isSmallScreen = window.matchMedia("(max-width: 900px)").matches;
+const isTouchDevice =
+  window.matchMedia("(pointer: coarse)").matches ||
+  (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+
+// NOTE: 기존 코드에서 쓰던 isMobile은 이제 '작은 화면(UI/감도 기준)'으로 통일
+const isMobile = isSmallScreen;
+
+
 console.log("🚀 dfy main.js loaded");
 
 /* ============================================================================
@@ -492,8 +503,10 @@ function openWishModal() {
     alert("먼저 사내 구글 계정으로 로그인 해주세요.");
     return;
   }
-  // 기본은 실명 + 프레임 OFF
-  setPrivacyUI(false);
+    // before
+  isPolaroidOn = true;
+
+  // after (기본 OFF)
   isPolaroidOn = false;
   updatePolaroidWriteUI();
 
@@ -545,6 +558,8 @@ function closeWishModal() {
   wishModal.classList.remove("showing");
   wishModal.classList.add("closing");
 
+  wishModal.classList.remove("closing");
+
   const finishClose = () => {
     // 완전히 닫힌 상태
     wishModal.classList.add("hidden");
@@ -558,8 +573,6 @@ function closeWishModal() {
     if (wishLetter) {
       wishLetter.classList.remove("is-closing");
       wishLetter.classList.remove("is-open");
-
-      wishModal.classList.remove("closing");
     }
   };
 
@@ -659,10 +672,15 @@ camera.position.set(0, 12, 24);
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
   alpha: true,
+  powerPreference: "high-performance",
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+
+// ✅ Windows(특히 터치/내장GPU)에서 DPR 2는 과부하가 잦아서 조금 낮춤
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_WIN ? 1.25 : 2));
+
+// ✅ 모바일(작은 화면)에서는 그림자 비용이 커서 비활성화(원하면 true로 유지 가능)
+renderer.shadowMap.enabled = !isMobile;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -708,7 +726,6 @@ worldColorMap.flipY = false;
 const worldBumpMap = textureLoader.load("source/world_Bump.png");
 worldBumpMap.colorSpace = THREE.NoColorSpace;
 worldBumpMap.flipY = false;
-  
 
 /* ============================================================================
  *  바닥 (World)
@@ -848,6 +865,20 @@ spotLight2.shadow.normalBias = 0.01;
 spotLight2.position.set(-6, 18, 4);
 spotLight2.target.position.set(-6, 0, 4);
 scene.add(spotLight2);
+
+// ✅ 모바일(작은 화면)에서는 그림자 OFF
+if (isMobile) {
+  spotLight.castShadow = false;
+  spotLight2.castShadow = false;
+}
+
+// ✅ Windows에서 그림자 비용을 낮춰 버벅임 완화
+if (IS_WIN) {
+  spotLight.shadow.mapSize.set(512, 512);
+  // 두번째 스포트 그림자는 체감 대비 비용이 커서 끔
+  spotLight2.castShadow = false;
+}
+
 scene.add(spotLight2.target);
 
 // 🔹 기본은 어둡게 시작
@@ -879,7 +910,7 @@ postLightMarker.position.set(0, 0, 0);
  * ==========================================================================*/
 
 const treeHeight = 8.2;
-const treeRadius = 3.65;
+const treeRadius = 3.6;
 const TREE_CENTER_Y =1.7 + treeHeight / 2;
 
 // 굳이 window에 올릴 필요 없이 그냥 로컬 그룹 하나 생성
@@ -1144,7 +1175,7 @@ for (let i = 0; i < LIGHT_COUNT; i++) {
  *  눈 파티클
  * ==========================================================================*/
 
-const snowCount = 400;
+const snowCount = 500;
 const snowGeo = new THREE.BufferGeometry();
 const snowPositions = new Float32Array(snowCount * 3);
 // ❗ 각 눈 파티클마다 떨어지는 속도 따로 저장
@@ -1182,7 +1213,7 @@ scene.add(snow);
 
 function getRandomPositionOnTree() {
   const maxAttempts = 25;    // 최대 시도 횟수
-  const minDist = 1.3;       // 카드끼리 최소 거리
+  const minDist = 1;       // 카드끼리 최소 거리
 
   // 트리 바닥 / 꼭대기 기준
   const yBottom = tree.position.y - treeHeight / 2;
@@ -1323,6 +1354,8 @@ function addImageToTree(docId, data) {
       imageMeshes.push(plane);
       meshToData.set(plane, { ...data, id: docId });
 
+      const frameScaleMul = useFrame ? 0.8 : 1; // ✅ 프레임 카드만 0.8배
+
       const ho = {
         id: docId,
         hanger,
@@ -1331,9 +1364,9 @@ function addImageToTree(docId, data) {
         vel: 0,
         stiffness: 100,
         damping: 8,
-        // 🔹 스케일 애니메이션
         scale: 0,
         targetScale: 1,
+        scaleMul: frameScaleMul,  // ✅ 추가
         toRemove: false,
       };
 
@@ -1344,9 +1377,25 @@ function addImageToTree(docId, data) {
       ho.hanger.scale.setScalar(0);
     },
     undefined,
-    (err) => console.error("텍스처 로드 오류", err)
+    (err) => {
+      console.error("❌ texture load failed:", docId, data.url, data.path, err);
+      shownImageIds.delete(docId);
+
+      // ✅ 본인 소원이고, 파일이 404면 문서도 정리
+      if (currentUser && data.ownerUid === currentUser.uid) {
+        fetch(data.url, { method: "GET" })
+          .then((res) => {
+            if (res.status === 404) {
+              console.warn("🧹 orphan doc remove:", docId);
+              // 문서만이라도 삭제 (Storage는 이미 없을 확률 높음)
+              deleteDoc(doc(imagesCol, docId)).catch(console.error);
+            }
+          })
+          .catch(() => {});
+      }
+    }
   );
-}
+} 
 
 
 /* ============================================================================
@@ -1405,23 +1454,24 @@ onSnapshot(q, (snapshot) => {
     const id = docSnap.id;
     const data = docSnap.data();
 
-    if (change.type === "added") {
-      if (!data.url) return;                 // ✅ url 없으면 스킵
-      if (shownImageIds.has(id)) return;
+    if (change.type === "removed") {
+      startRemoveCard(id);
+      return;
+    }
+
+    // ✅ added + modified 모두 처리 (url이 생기면 트리에 올림)
+    if ((change.type === "added" || change.type === "modified")) {
+      if (!data.url) return;                // url 없으면 아직 스킵
+      if (shownImageIds.has(id)) return;    // 이미 올렸으면 스킵
+
       shownImageIds.add(id);
       addImageToTree(id, data);
-
-    } else if (change.type === "modified") {
-      // ✅ 과거 꼬인 문서(처음엔 url 없었음)가 나중에 url 생기는 경우도 트리에 추가
-      if (data.url && !shownImageIds.has(id)) {
-        shownImageIds.add(id);
-        addImageToTree(id, data);
-      }
     }
   });
 
   renderMyWishes();
 });
+
 
 // 🔹 삭제된 카드 → 스케일 0으로 줄어들게 마킹
 function startRemoveCard(docId) {
@@ -1464,8 +1514,8 @@ function cleanupCardById(docId) {
  * ==========================================================================*/
 
 function compressImage(file) {
-  const MAX_WIDTH = 1080;
-  const MAX_HEIGHT = 1080;
+  const MAX_WIDTH = 1920;
+  const MAX_HEIGHT = 1920;
   const MAX_MB = 1.5;
 
   const sizeMB = file.size / (1024 * 1024);
@@ -1659,24 +1709,20 @@ async function handleDeleteImage(docId, data) {
   const ok = confirm("정말 이 소원을 삭제할까요?");
   if (!ok) return;
 
+  // ✅ Storage 삭제 실패해도 문서 삭제는 진행
   try {
-    // 1) 스토리지는 "시도"만 하고, 실패해도 문서 삭제는 진행
     if (data.path) {
       try {
-        const fileRef = ref(storage, data.path);
-        await deleteObject(fileRef);
+        await deleteObject(ref(storage, data.path));
       } catch (e) {
         console.warn("스토리지 파일 삭제 실패(무시하고 문서 삭제 진행):", e);
       }
     }
 
-    // 2) Firestore 문서는 무조건 삭제 시도
-    await deleteDoc(doc(imagesCol, docId));
-  } catch (err) {
-    console.error("삭제 실패", err);
-    alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
+    await deleteDoc(doc(imagesCol, docId)); // ✅ 항상 실행
+  } catch (e) {
+    console.error("문서 삭제 실패:", e);
   }
-
 }
 
 /* ============================================================================
@@ -2005,9 +2051,6 @@ let gyroBaseBeta = 0;
 let gyroBaseGamma = 0;
 let gyroCalibrated = false;
 
-const isMobile =
-  "ontouchstart" in window ||
-  (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
 
 function beginDrag(clientX) {
   isDragging = true;
@@ -2036,6 +2079,7 @@ function moveDrag(clientX) {
 
 
 renderer.domElement.addEventListener("mousedown", (event) => {
+  // ✅ 모바일(작은 화면)에서는 탭이 mouse로 변환되는 현상 방지
   if (isMobile) return;
   beginDrag(event.clientX);
 });
@@ -2051,13 +2095,15 @@ window.addEventListener("mousemove", (event) => {
   mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   mouseY = (event.clientY / window.innerHeight) * 2 - 1;
 
-  if (isDragging) moveDrag(event.clientX);
+  if (isDragging) {
+    moveDrag(event.clientX);
+  }
 });
 
 renderer.domElement.addEventListener(
   "touchstart",
   (event) => {
-    if (!isMobile) return;
+    if (!isTouchDevice) return;
     const touch = event.touches[0];
     if (!touch) return;
     beginDrag(touch.clientX);
@@ -2068,7 +2114,7 @@ renderer.domElement.addEventListener(
 window.addEventListener(
   "touchmove",
   (event) => {
-    if (!isMobile || !isDragging) return;
+    if (!isTouchDevice || !isDragging) return;
     const touch = event.touches[0];
     if (!touch) return;
     moveDrag(touch.clientX);
@@ -2079,7 +2125,7 @@ window.addEventListener(
 window.addEventListener(
   "touchend",
   () => {
-    if (!isMobile) return;
+    if (!isTouchDevice) return;
     isDragging = false;
   },
   { passive: true }
@@ -2130,19 +2176,15 @@ function setupGyroButton() {
 
   const btn = document.createElement("button");
   btn.textContent = "📱 기울여서 보기";
-  btn.style.top = "auto";
-  btn.style.left = "50%";
-  btn.style.right = "auto";
-  btn.style.bottom = "calc(env(safe-area-inset-bottom) + 16px)";
-  btn.style.transform = "translateX(-50%)";
   btn.style.position = "fixed";
+  btn.style.top = "16px";
+  btn.style.left = "16px";
   btn.style.zIndex = "9999";
-  btn.style.padding = "9px 18px";
+  btn.style.padding = "8px 12px";
   btn.style.borderRadius = "20px";
   btn.style.border = "none";
-  btn.style.fontSize = "16px";
-  btn.style.background = "rgba(102, 102, 102, 0.1)";
-  btn.style.boxShadow = "inset 0 1px 1px #e5e7eb40";
+  btn.style.fontSize = "12px";
+  btn.style.background = "rgba(0,0,0,0.6)";
   btn.style.color = "#fff";
   btn.style.backdropFilter = "blur(10px)";
   btn.style.cursor = "pointer";
@@ -2163,8 +2205,9 @@ function setupGyroButton() {
       useGyro = true;
       window.addEventListener("deviceorientation", handleOrientation, true);
 
-      btn.style.display = "none";
+      btn.textContent = "📱 기울여서 보기 ON";
       btn.disabled = true;
+      btn.style.opacity = "0.6";
     } catch (err) {
       console.error("gyro permission error", err);
       alert("자이로 권한 요청 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
@@ -2212,7 +2255,14 @@ window.addEventListener("resize", () => {
  *  애니메이션 루프
  * ==========================================================================*/
 
+
 let lastTime = 0;
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    lastTime = performance.now(); // ✅ 복귀 직후 delta 폭주 방지
+  }
+});
 
 const PARALLAX_DESKTOP = {
   x: 8,
@@ -2228,8 +2278,14 @@ const PARALLAX_MOBILE = {
 
 function animate(time) {
   requestAnimationFrame(animate);
-  const delta = (time - lastTime) / 1000;
+  let delta = (time - lastTime) / 1000;
+
+  // ✅ 탭 복귀/일시정지 등으로 delta가 튀는 걸 방지
+  if (!lastTime) delta = 0;
+  delta = Math.min(delta, 1 / 30); // 최대 33ms로 클램프 (원하면 1/60)
+
   lastTime = time;
+
 
   // 기본 트리 회전
   if (!isDragging) {
@@ -2320,7 +2376,7 @@ function animate(time) {
     ho.scale = ho.scale + (ho.targetScale - ho.scale) * sLerp;
 
     // ✅ 등장/퇴장 스케일(ho.scale)에 전역 스케일(globalCardScale)을 곱해서 적용
-    ho.hanger.scale.setScalar(ho.scale * globalCardScale);
+    ho.hanger.scale.setScalar(ho.scale * globalCardScale * (ho.scaleMul ?? 1));
   }
 
 
