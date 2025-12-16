@@ -876,7 +876,7 @@ postLightMarker.position.set(0, 0, 0);
  *  트리 & 레이어 셰이딩 (Star / Tree / Trunk / Snow)
  * ==========================================================================*/
 
-const treeHeight = 8;
+const treeHeight = 8.3;
 const treeRadius = 3.6;
 const TREE_CENTER_Y =1.7 + treeHeight / 2;
 
@@ -1187,7 +1187,7 @@ function getRandomPositionOnTree() {
   const yTop    = tree.position.y + treeHeight / 2;
 
   // 🔹 높이 비율 범위 (0 = 바닥, 1 = 꼭대기)
-  const minN = 0.1;   // 바닥에서 ~% 위
+  const minN = 0.13;   // 바닥에서 ~% 위
   const maxN = 0.86;  // 꼭대기 바로 아래
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1310,7 +1310,7 @@ function addImageToTree(docId, data) {
       const tiltAxis = new THREE.Vector3()
         .crossVectors(swingAxis, up)
         .normalize();
-      const tiltAngle = THREE.MathUtils.degToRad(15);
+      const tiltAngle = THREE.MathUtils.degToRad(18);
       const tiltQ = new THREE.Quaternion().setFromAxisAngle(
         tiltAxis,
         tiltAngle
