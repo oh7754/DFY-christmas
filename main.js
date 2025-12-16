@@ -894,7 +894,7 @@ treeGroup.add(star);
 
 
 // 디버그용 소원 영역 콘
-const SHOW_WISH_CONE = true;
+const SHOW_WISH_CONE = false;
 if (SHOW_WISH_CONE) {
   const coneGeom = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
   const coneEdges = new THREE.EdgesGeometry(coneGeom);
