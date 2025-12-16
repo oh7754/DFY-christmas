@@ -203,8 +203,8 @@ const cardPositions = [];
 // 여기 값들만 바꾸면 전체 카드 스케일 정책을 쉽게 조정할 수 있습니다.
 const CARD_SCALE_STEPS = [
   // maxCount 이하일 때 scale 적용
-  { maxCount: 20, scale: 1.0 },      // 1~20장까지는 1.0
-  { maxCount: 40, scale: 0.85 },      // 21~40장은 0.8
+  { maxCount: 20, scale: 1.1 },      // 1~20장까지는 1.0
+  { maxCount: 40, scale: 0.9 },      // 21~40장은 0.8
   { maxCount: 80, scale: 0.7 },      // 41~80장은 0.6
   { maxCount: Infinity, scale: 0.6 }, // 81장 이상도 0.6 (원하면 수정)
 ];
@@ -894,7 +894,7 @@ treeGroup.add(star);
 
 
 // 디버그용 소원 영역 콘
-const SHOW_WISH_CONE = false;
+const SHOW_WISH_CONE = true;
 if (SHOW_WISH_CONE) {
   const coneGeom = new THREE.ConeGeometry(treeRadius, treeHeight, 32, 1, true);
   const coneEdges = new THREE.EdgesGeometry(coneGeom);
@@ -1321,6 +1321,8 @@ function addImageToTree(docId, data) {
       imageMeshes.push(plane);
       meshToData.set(plane, { ...data, id: docId });
 
+      const frameScaleMul = useFrame ? 0.84 : 1; // ✅ 프레임 카드만 0.8배
+
       const ho = {
         id: docId,
         hanger,
@@ -1331,6 +1333,7 @@ function addImageToTree(docId, data) {
         damping: 8,
         // 🔹 스케일 애니메이션
         scale: 0,
+        scaleMul: frameScaleMul,  // ✅ 추가
         targetScale: 1,
         toRemove: false,
       };
@@ -2192,6 +2195,12 @@ window.addEventListener("resize", () => {
 
 let lastTime = 0;
 
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    clock.getDelta(); // ✅ 큰 dt 한 번 버리기
+  }
+});
+
 const PARALLAX_DESKTOP = {
   x: 8,
   y: 4,
@@ -2206,7 +2215,12 @@ const PARALLAX_MOBILE = {
 
 function animate(time) {
   requestAnimationFrame(animate);
-  const delta = (time - lastTime) / 1000;
+  let delta = (time - lastTime) / 1000;
+
+  // ✅ 탭 복귀/일시정지 등으로 delta가 튀는 걸 방지
+  if (!lastTime) delta = 0;
+  delta = Math.min(delta, 1 / 30); // 최대 33ms로 클램프 (원하면 1/60)
+
   lastTime = time;
 
   // 기본 트리 회전
@@ -2298,7 +2312,7 @@ function animate(time) {
     ho.scale = ho.scale + (ho.targetScale - ho.scale) * sLerp;
 
     // ✅ 등장/퇴장 스케일(ho.scale)에 전역 스케일(globalCardScale)을 곱해서 적용
-    ho.hanger.scale.setScalar(ho.scale * globalCardScale);
+    ho.hanger.scale.setScalar(ho.scale * globalCardScale * (ho.scaleMul ?? 1));
   }
 
 
